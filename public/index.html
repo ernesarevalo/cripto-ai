@@ -19,9 +19,13 @@
     }
 
     .big { font-size: 24px; }
+
     .buy { color: lime; }
     .sell { color: red; }
     .wait { color: yellow; }
+
+    .positive { color: lime; }
+    .negative { color: red; }
   </style>
 </head>
 
@@ -35,13 +39,11 @@
 <button onclick="setBuy()">Guardar Compra</button>
 <button onclick="setSell()">Guardar Venta</button>
 
+<div class="big" id="positionLine"></div>
+
 <div class="big" id="price"></div>
 <div id="prediction"></div>
 <div id="rsi"></div>
-<div id="buy"></div>
-<div id="sell"></div>
-<div id="pnlBuy"></div>
-<div id="pnlSell"></div>
 
 <div class="big" id="signal"></div>
 
@@ -60,18 +62,33 @@ async function loadData() {
   const res = await fetch("/btc");
   const d = await res.json();
 
-  document.getElementById("price").innerText = "BTC: " + d.current.toFixed(2);
-  document.getElementById("prediction").innerText = "Prediction: " + (d.prediction * 100).toFixed(2) + "%";
-  document.getElementById("rsi").innerText = "RSI: " + d.rsi.toFixed(2);
+  document.getElementById("price").innerText =
+    "BTC: " + d.current.toFixed(2);
 
-  document.getElementById("buy").innerText = "Buy: " + (d.buy || "-");
-  document.getElementById("sell").innerText = "Sell: " + (d.sell || "-");
+  document.getElementById("prediction").innerText =
+    "Prediction: " + (d.prediction * 100).toFixed(2) + "%";
 
-  document.getElementById("pnlBuy").innerText =
-    d.pnlBuy ? "PnL Buy: " + d.pnlBuy.toFixed(2) + "%" : "";
+  document.getElementById("rsi").innerText =
+    "RSI: " + d.rsi.toFixed(2);
 
-  document.getElementById("pnlSell").innerText =
-    d.pnlSell ? "PnL Sell: " + d.pnlSell.toFixed(2) + "%" : "";
+  // 🧠 LINEA PRINCIPAL
+  const line = document.getElementById("positionLine");
+
+  if (d.position === "BUY") {
+    const pct = d.percent.toFixed(2);
+    line.innerText = `Precio Compra: ${d.buy} - ${pct}%`;
+    line.className = "big " + (pct >= 0 ? "positive" : "negative");
+  }
+
+  if (d.position === "SELL") {
+    const pct = d.percent.toFixed(2);
+    line.innerText = `Precio Venta: ${d.sell} - ${pct}%`;
+    line.className = "big " + (pct >= 0 ? "positive" : "negative");
+  }
+
+  if (!d.position) {
+    line.innerText = "";
+  }
 
   const signalEl = document.getElementById("signal");
   signalEl.innerText = d.signal;

@@ -9,7 +9,6 @@ app.use(express.static("public"));
 
 const DATA_FILE = "./data.json";
 
-// 🧠 leer datos
 function loadData() {
   try {
     return JSON.parse(fs.readFileSync(DATA_FILE));
@@ -18,7 +17,6 @@ function loadData() {
   }
 }
 
-// 💾 guardar datos
 function saveData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 }
@@ -48,10 +46,9 @@ function calculateRSI(prices, period = 14) {
   return 100 - (100 / (1 + rs));
 }
 
-function getSignal(prediction, rsi, pnl) {
+function getSignal(prediction, rsi) {
   if (prediction > 0.015 && rsi < 65) return "BUY";
   if (prediction < -0.015 && rsi > 60) return "SELL";
-  if (pnl && pnl > 5) return "SELL";
   return "WAIT";
 }
 
@@ -72,25 +69,30 @@ app.get("/btc", async (req, res) => {
 
     const data = loadData();
 
-    const pnlBuy = data.buy
-      ? ((current - data.buy) / data.buy) * 100
-      : null;
+    let position = null;
+    let percent = null;
 
-    const pnlSell = data.sell
-      ? ((data.sell - current) / data.sell) * 100
-      : null;
+    if (data.buy) {
+      position = "BUY";
+      percent = ((current - data.buy) / data.buy) * 100;
+    }
 
-    const signal = getSignal(prediction, rsi, pnlBuy);
+    if (data.sell) {
+      position = "SELL";
+      percent = ((data.sell - current) / data.sell) * 100;
+    }
+
+    const signal = getSignal(prediction, rsi);
 
     res.json({
       current,
       prediction,
       rsi,
-      pnlBuy,
-      pnlSell,
+      signal,
+      position,
+      percent,
       buy: data.buy || null,
-      sell: data.sell || null,
-      signal
+      sell: data.sell || null
     });
 
   } catch (err) {
@@ -98,19 +100,25 @@ app.get("/btc", async (req, res) => {
   }
 });
 
-// 💾 guardar compra
 app.get("/set-buy/:price", (req, res) => {
   const data = loadData();
+
   data.buy = parseFloat(req.params.price);
+  delete data.sell; // 🔥 BORRA venta
+
   saveData(data);
+
   res.send("Buy saved");
 });
 
-// 💾 guardar venta
 app.get("/set-sell/:price", (req, res) => {
   const data = loadData();
+
   data.sell = parseFloat(req.params.price);
+  delete data.buy; // 🔥 BORRA compra
+
   saveData(data);
+
   res.send("Sell saved");
 });
 
