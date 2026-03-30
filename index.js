@@ -14,7 +14,14 @@ async function getPrices() {
   const res = await fetch(
     "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7"
   );
+
   const data = await res.json();
+
+  // 🔴 VALIDACIÓN CLAVE
+  if (!data.prices) {
+    throw new Error("CoinGecko API error: no prices returned");
+  }
+
   return data.prices.map(p => p[1]);
 }
 
@@ -34,8 +41,14 @@ app.get("/btc", async (req, res) => {
       pnl,
       prediction
     });
+
   } catch (err) {
-    res.json({ error: err.toString() });
+    console.error(err);
+
+    res.json({
+      error: "API failed",
+      detail: err.toString()
+    });
   }
 });
 
