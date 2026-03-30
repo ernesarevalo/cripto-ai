@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Crypto AI</title>
+  <style>
+    body {
+      background: black;
+      color: #00ff00;
+      font-family: monospace;
+      text-align: center;
+    }
+
+    input, button {
+      background: black;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 10px;
+      margin: 5px;
+    }
+
+    .big { font-size: 24px; }
+    .buy { color: lime; }
+    .sell { color: red; }
+    .wait { color: yellow; }
+  </style>
+</head>
+
+<body>
+
+<h1>CRYPTO AI TERMINAL</h1>
+
+<input id="priceInput" placeholder="Precio">
+<br>
+
+<button onclick="setBuy()">Guardar Compra</button>
+<button onclick="setSell()">Guardar Venta</button>
+
+<div class="big" id="price"></div>
+<div id="prediction"></div>
+<div id="rsi"></div>
+<div id="buy"></div>
+<div id="sell"></div>
+<div id="pnlBuy"></div>
+<div id="pnlSell"></div>
+
+<div class="big" id="signal"></div>
+
+<script>
+async function setBuy() {
+  const val = document.getElementById("priceInput").value;
+  await fetch(`/set-buy/${val}`);
+}
+
+async function setSell() {
+  const val = document.getElementById("priceInput").value;
+  await fetch(`/set-sell/${val}`);
+}
+
+async function loadData() {
+  const res = await fetch("/btc");
+  const d = await res.json();
+
+  document.getElementById("price").innerText = "BTC: " + d.current.toFixed(2);
+  document.getElementById("prediction").innerText = "Prediction: " + (d.prediction * 100).toFixed(2) + "%";
+  document.getElementById("rsi").innerText = "RSI: " + d.rsi.toFixed(2);
+
+  document.getElementById("buy").innerText = "Buy: " + (d.buy || "-");
+  document.getElementById("sell").innerText = "Sell: " + (d.sell || "-");
+
+  document.getElementById("pnlBuy").innerText =
+    d.pnlBuy ? "PnL Buy: " + d.pnlBuy.toFixed(2) + "%" : "";
+
+  document.getElementById("pnlSell").innerText =
+    d.pnlSell ? "PnL Sell: " + d.pnlSell.toFixed(2) + "%" : "";
+
+  const signalEl = document.getElementById("signal");
+  signalEl.innerText = d.signal;
+
+  signalEl.className = "big " +
+    (d.signal === "BUY" ? "buy" :
+     d.signal === "SELL" ? "sell" : "wait");
+}
+
+setInterval(loadData, 5000);
+loadData();
+</script>
+
+</body>
+</html>

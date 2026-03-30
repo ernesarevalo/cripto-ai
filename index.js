@@ -1,14 +1,27 @@
 import express from "express";
 import fetch from "node-fetch";
 import { execSync } from "child_process";
+import fs from "fs";
 
 const app = express();
 
-let entryPrice = null;
+app.use(express.static("public"));
 
-app.get("/", (req, res) => {
-  res.send("Crypto AI running 🚀");
-});
+const DATA_FILE = "./data.json";
+
+// 🧠 leer datos
+function loadData() {
+  try {
+    return JSON.parse(fs.readFileSync(DATA_FILE));
+  } catch {
+    return {};
+  }
+}
+
+// 💾 guardar datos
+function saveData(data) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+}
 
 async function getPrices() {
   const res = await fetch(
@@ -17,12 +30,29 @@ async function getPrices() {
 
   const data = await res.json();
 
-  // 🔴 VALIDACIÓN CLAVE
-  if (!data.prices) {
-    throw new Error("CoinGecko API error: no prices returned");
-  }
+  if (!data.prices) throw new Error("API failed");
 
   return data.prices.map(p => p[1]);
+}
+
+function calculateRSI(prices, period = 14) {
+  let gains = 0, losses = 0;
+
+  for (let i = prices.length - period; i < prices.length - 1; i++) {
+    const diff = prices[i + 1] - prices[i];
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+
+  const rs = gains / (losses || 1);
+  return 100 - (100 / (1 + rs));
+}
+
+function getSignal(prediction, rsi, pnl) {
+  if (prediction > 0.015 && rsi < 65) return "BUY";
+  if (prediction < -0.015 && rsi > 60) return "SELL";
+  if (pnl && pnl > 5) return "SELL";
+  return "WAIT";
 }
 
 app.get("/btc", async (req, res) => {
@@ -30,31 +60,58 @@ app.get("/btc", async (req, res) => {
     const prices = await getPrices();
     const current = prices[prices.length - 1];
 
-    const prediction = execSync("python3 model_runner.py").toString();
+    let prediction = 0;
 
-    const pnl = entryPrice
-      ? ((current - entryPrice) / entryPrice) * 100
+    try {
+      prediction = parseFloat(
+        execSync("python3 model_runner.py").toString().trim()
+      );
+    } catch {}
+
+    const rsi = calculateRSI(prices);
+
+    const data = loadData();
+
+    const pnlBuy = data.buy
+      ? ((current - data.buy) / data.buy) * 100
       : null;
+
+    const pnlSell = data.sell
+      ? ((data.sell - current) / data.sell) * 100
+      : null;
+
+    const signal = getSignal(prediction, rsi, pnlBuy);
 
     res.json({
       current,
-      pnl,
-      prediction
+      prediction,
+      rsi,
+      pnlBuy,
+      pnlSell,
+      buy: data.buy || null,
+      sell: data.sell || null,
+      signal
     });
 
   } catch (err) {
-    console.error(err);
-
-    res.json({
-      error: "API failed",
-      detail: err.toString()
-    });
+    res.json({ error: err.toString() });
   }
 });
 
-app.get("/set-entry/:price", (req, res) => {
-  entryPrice = parseFloat(req.params.price);
-  res.send("Entry price saved");
+// 💾 guardar compra
+app.get("/set-buy/:price", (req, res) => {
+  const data = loadData();
+  data.buy = parseFloat(req.params.price);
+  saveData(data);
+  res.send("Buy saved");
+});
+
+// 💾 guardar venta
+app.get("/set-sell/:price", (req, res) => {
+  const data = loadData();
+  data.sell = parseFloat(req.params.price);
+  saveData(data);
+  res.send("Sell saved");
 });
 
 app.listen(3000, () => console.log("Running on port 3000"));
