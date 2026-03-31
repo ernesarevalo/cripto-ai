@@ -1,16 +1,18 @@
-# cripto-ai v2 🟠
+# cripto-ai v3 🟠
 
-Crypto trading AI con ML (RandomForest) + análisis técnico + señales de compra/venta.
+Mini plataforma de trading Bitcoin: ML + análisis técnico + multiusuario + historial persistente.
 
 ## Estructura
 
 ```
 cripto-ai/
 ├── public/
-│   └── index.html       ← Frontend (BTC Oracle UI)
-├── index.js             ← Servidor Express + API endpoints
-├── model.py             ← RandomForest ML (port mejorado)
-├── model_runner.py      ← Runner: fetch precio → corre modelo → JSON
+│   └── index.html       ← SPA completa (login, dashboard, operación, historial, mercado, admin)
+├── index.js             ← Express API (auth, operaciones, señal ML, IA, market, admin)
+├── db.js                ← SQLite con better-sqlite3 (schema + seed admin)
+├── auth.js              ← JWT middleware
+├── model.py             ← RandomForest ML
+├── model_runner.py      ← Fetcher de precios + runner del modelo
 ├── package.json
 ├── requirements.txt
 ├── Dockerfile
@@ -20,40 +22,59 @@ cripto-ai/
 ## Instalación local
 
 ```bash
-# 1. Clonar
 git clone https://github.com/ernesarevalo/cripto-ai
 cd cripto-ai
 
-# 2. Instalar dependencias Node
+# Instalar dependencias Node
 npm install
 
-# 3. Instalar dependencias Python
+# Instalar dependencias Python
 pip3 install -r requirements.txt
 
-# 4. Crear archivo .env
+# Variables de entorno
 cp .env.example .env
-# Editar .env y poner tu ANTHROPIC_API_KEY
+# Editar .env con tu ANTHROPIC_API_KEY y JWT_SECRET
 
-# 5. Correr
 npm start
 # → http://localhost:3000
 ```
 
+**Login inicial:**
+- Usuario: `ernes`
+- Contraseña: `adminernes!1`
+- Rol: admin
+
 ## API Endpoints
 
-- `GET /api/signal` — Corre el modelo ML y retorna señal de trading
-- `POST /api/analyze` — Análisis personalizado con Claude AI
+| Método | Ruta | Auth | Descripción |
+|--------|------|------|-------------|
+| POST | /api/login | ❌ | Login, devuelve JWT |
+| GET | /api/me | ✅ | Perfil del usuario |
+| POST | /api/operacion | ✅ | Registrar compra/venta |
+| GET | /api/operaciones | ✅ | Historial del usuario |
+| DELETE | /api/operaciones | ✅ | Reset historial propio |
+| GET | /api/signal | ✅ | Señal ML (caché 60s) |
+| POST | /api/analyze | ✅ | Análisis IA personalizado |
+| GET | /api/market | ✅ | Altcoins + alertas + arbitraje |
+| GET | /api/admin/users | 👑 | Lista todos los usuarios |
+| POST | /api/admin/users | 👑 | Crear usuario |
+| DELETE | /api/admin/users/:id | 👑 | Eliminar usuario |
+| PATCH | /api/admin/users/:id/password | 👑 | Cambiar contraseña |
+| DELETE | /api/admin/users/:id/operaciones | 👑 | Reset historial de usuario |
 
-## Variables de entorno
+## Deploy en Render
 
-| Variable | Descripción |
-|---|---|
-| `ANTHROPIC_API_KEY` | API key de Anthropic para análisis IA |
-| `PORT` | Puerto del servidor (default: 3000) |
+1. Conectar repo GitHub a Render
+2. Build command: `npm install && pip3 install -r requirements.txt`
+3. Start command: `npm start`
+4. Variables de entorno: `ANTHROPIC_API_KEY`, `JWT_SECRET`
 
 ## Docker
 
 ```bash
 docker build -t cripto-ai .
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-xxx cripto-ai
+docker run -p 3000:3000 \
+  -e ANTHROPIC_API_KEY=sk-ant-xxx \
+  -e JWT_SECRET=mi-secreto-seguro \
+  cripto-ai
 ```
