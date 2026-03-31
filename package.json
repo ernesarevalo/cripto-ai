@@ -1,8 +1,13 @@
 {
-  "name": "crypto-ai",
-  "version": "1.0.0",
+  "name": "cripto-ai",
+  "version": "2.0.0",
+  "description": "Crypto trading AI with ML predictions and signals",
   "type": "module",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
   "dependencies": {
     "express": "^4.18.2",
     "node-fetch": "^3.3.2"

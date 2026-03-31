@@ -1,22 +1,21 @@
-FROM node:18
+FROM node:20-slim
 
-RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
+# Instalar Python y pip
+RUN apt-get update && apt-get install -y python3 python3-pip python3-venv --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY . .
+# Dependencias Python
+COPY requirements.txt .
+RUN pip3 install --break-system-packages -r requirements.txt
 
-# Crear entorno virtual
-RUN python3 -m venv venv
-
-# Activarlo e instalar dependencias
-RUN ./venv/bin/pip install --upgrade pip
-RUN ./venv/bin/pip install -r requirements.txt
-
-# Instalar node
+# Dependencias Node
+COPY package*.json .
 RUN npm install
 
-# Usar python del venv
-ENV PATH="/app/venv/bin:$PATH"
+# Código fuente
+COPY . .
 
+EXPOSE 3000
 CMD ["node", "index.js"]

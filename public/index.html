@@ -1,106 +1,512 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <title>Crypto AI</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BTC Oracle — cripto-ai v2</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      background: black;
-      color: #00ff00;
-      font-family: monospace;
-      text-align: center;
+      min-height: 100vh;
+      background: #060912;
+      color: #ccd;
+      font-family: 'Courier New', monospace;
+      padding: 16px 14px;
     }
 
-    input, button {
-      background: black;
-      border: 1px solid #00ff00;
-      color: #00ff00;
-      padding: 10px;
-      margin: 5px;
+    .app { max-width: 460px; margin: 0 auto; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 18px; }
+    .header-tag { font-size: 10px; letter-spacing: 6px; color: #3366ff; margin-bottom: 3px; }
+    .header-sub { font-size: 8px; color: #2a3a55; letter-spacing: 4px; }
+
+    /* Cards */
+    .card {
+      background: #0b1020;
+      border: 1px solid #1a2540;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .card-label {
+      font-size: 9px;
+      color: #3366ff;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
     }
 
-    .big { font-size: 24px; }
+    /* Price */
+    .price-row { display: flex; justify-content: space-between; align-items: flex-start; }
+    .price-value { font-size: 34px; font-weight: bold; color: #fff; letter-spacing: -1px; }
+    .price-change { font-size: 12px; margin-top: 4px; }
+    .price-meta { font-size: 8px; color: #2a3a55; margin-top: 4px; text-align: right; }
 
-    .buy { color: lime; }
-    .sell { color: red; }
-    .wait { color: yellow; }
+    /* Sparkline */
+    #sparkline { display: block; }
 
-    .positive { color: lime; }
-    .negative { color: red; }
+    /* Signal */
+    .signal-card { transition: box-shadow 0.5s, border-color 0.5s; }
+    .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .signal-confidence { font-size: 9px; color: #445577; }
+    .signal-action { font-size: 28px; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; transition: color 0.5s; }
+    .signal-bar-track { height: 3px; background: #0a1525; border-radius: 2px; margin-bottom: 10px; }
+    .signal-bar-fill { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
+    .indicators { display: flex; gap: 14px; font-size: 10px; color: #445577; }
+
+    /* Scores grid */
+    .scores-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .score-box { background: #080f20; border-radius: 8px; padding: 8px 10px; }
+    .score-box-label { font-size: 8px; color: #445577; letter-spacing: 2px; margin-bottom: 3px; }
+    .score-box-value { font-size: 16px; font-weight: bold; }
+
+    /* ML gauge */
+    .ml-gauge { background: #080f20; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+    .ml-gauge-label { font-size: 9px; color: #446; letter-spacing: 2px; margin-bottom: 4px; }
+    .ml-gauge-bar { height: 4px; background: #0a1525; border-radius: 2px; margin-bottom: 4px; }
+    .ml-gauge-fill { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
+    .ml-gauge-row { display: flex; justify-content: space-between; font-size: 9px; color: #334; }
+
+    /* Tabs */
+    .tabs { display: flex; background: #0b1020; border: 1px solid #1a2540; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+    .tab-btn {
+      flex: 1; padding: 11px 8px; border: none; cursor: pointer;
+      font-family: inherit; font-size: 11px;
+      background: transparent; color: #334;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active { background: #152035; color: #6699ff; border-bottom-color: #3366ff; }
+
+    /* Panel */
+    .panel { background: #0b1020; border: 1px solid #1a2540; border-radius: 14px; padding: 16px; margin-bottom: 10px; }
+
+    /* Input */
+    .input-label { font-size: 9px; color: #4466aa; letter-spacing: 3px; margin-bottom: 6px; }
+    .input-wrap {
+      display: flex; align-items: center; gap: 8px;
+      background: #070d1a; border-radius: 10px; padding: 10px 14px;
+    }
+    .input-wrap span { font-size: 14px; font-weight: bold; }
+    .input-wrap input {
+      background: transparent; border: none; outline: none;
+      color: #dde; font-size: 16px; font-family: inherit; width: 100%;
+    }
+
+    /* Metric cards */
+    .metric { border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+    .metric-label { font-size: 9px; color: #446; letter-spacing: 2px; margin-bottom: 4px; }
+    .metric-value { font-size: 26px; font-weight: bold; margin-top: 4px; }
+    .metric-sub { font-size: 10px; color: #667; margin-top: 2px; }
+    .metric-row { display: flex; justify-content: space-between; align-items: center; }
+    .metric-right { text-align: right; font-size: 11px; }
+    .metric-right .lbl { font-size: 9px; color: #446; }
+    .metric-right .val { margin-top: 3px; }
+    .target-box { border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+    .target-label { font-size: 9px; letter-spacing: 2px; margin-bottom: 8px; }
+    .target-price { font-size: 26px; font-weight: bold; }
+    .target-pct { font-size: 10px; color: #445; margin-top: 3px; }
+    .target-bb { text-align: right; font-size: 10px; color: #446; line-height: 2.2; }
+    .target-tip { margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a2a3a; font-size: 10px; color: #667; }
+
+    /* Semaforo */
+    .semaforo { display: flex; align-items: center; gap: 12px; background: #070d1a; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+    .semaforo-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .semaforo-text { font-size: 10px; color: #778; line-height: 1.5; }
+
+    /* Empty state */
+    .empty { font-size: 10px; color: #2a3a50; text-align: center; padding: 20px 0; }
+
+    /* AI section */
+    .ai-section { background: #0b1020; border: 1px solid #1a2540; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+    .ai-text { font-size: 12px; color: #aab; line-height: 1.9; }
+    .ai-placeholder { font-size: 10px; color: #2a3a50; }
+    .ai-btn {
+      margin-top: 10px; padding: 9px 18px;
+      background: transparent; border: 1px solid #3366ff55;
+      border-radius: 8px; color: #4477ff;
+      font-family: inherit; font-size: 9px; letter-spacing: 2px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .ai-btn:disabled { color: #2a3a55; cursor: not-allowed; }
+
+    /* Footer */
+    .footer { text-align: center; font-size: 8px; color: #1a2535; line-height: 2.2; letter-spacing: 1px; }
+
+    /* Spinner */
+    .spinner { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-state { font-size: 13px; color: #3366ff; margin: 8px 0; }
   </style>
 </head>
-
 <body>
+<div class="app">
 
-<h1>CRYPTO AI TERMINAL</h1>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-tag">◈ BTC ORACLE ◈</div>
+    <div class="header-sub">ML + ANÁLISIS TÉCNICO · cripto-ai v2</div>
+  </div>
 
-<input id="priceInput" placeholder="Precio">
-<br>
+  <!-- Precio -->
+  <div class="card" id="price-card">
+    <div class="price-row">
+      <div>
+        <div class="card-label">BITCOIN / USD</div>
+        <div class="price-value" id="price-display">Cargando…</div>
+        <div class="price-change" id="change-display"></div>
+      </div>
+      <div>
+        <svg id="sparkline" width="110" height="34"></svg>
+        <div class="price-meta" id="update-time"></div>
+      </div>
+    </div>
+  </div>
 
-<button onclick="setBuy()">Guardar Compra</button>
-<button onclick="setSell()">Guardar Venta</button>
+  <!-- Señal -->
+  <div class="card signal-card" id="signal-card">
+    <div class="signal-header">
+      <div class="card-label">SEÑAL COMBINADA ML + TÉCNICO</div>
+      <div class="signal-confidence" id="confidence-display">—</div>
+    </div>
+    <div class="signal-action" id="action-display">⚙ CARGANDO···</div>
+    <div class="signal-bar-track">
+      <div class="signal-bar-fill" id="conf-bar" style="width:0%"></div>
+    </div>
 
-<div class="big" id="positionLine"></div>
+    <!-- Scores -->
+    <div class="scores-grid" id="scores-grid" style="display:none">
+      <div class="score-box">
+        <div class="score-box-label">SCORE TÉCNICO</div>
+        <div class="score-box-value" id="tech-score">—</div>
+      </div>
+      <div class="score-box">
+        <div class="score-box-label">SCORE ML (RF)</div>
+        <div class="score-box-value" id="ml-score">—</div>
+      </div>
+    </div>
 
-<div class="big" id="price"></div>
-<div id="prediction"></div>
-<div id="rsi"></div>
+    <!-- ML Gauge -->
+    <div class="ml-gauge" id="ml-gauge" style="display:none">
+      <div class="ml-gauge-label">PREDICCIÓN ML</div>
+      <div class="ml-gauge-bar">
+        <div class="ml-gauge-fill" id="ml-gauge-fill" style="width:50%"></div>
+      </div>
+      <div class="ml-gauge-row">
+        <span style="color:#ff3d5a">BAJA</span>
+        <span id="ml-gauge-label" style="font-weight:bold">NEUTRAL</span>
+        <span style="color:#00e87a">SUBE</span>
+      </div>
+    </div>
 
-<div class="big" id="signal"></div>
+    <div class="indicators" id="indicators">
+      <span>RSI <span id="rsi-val">—</span></span>
+      <span>MACD <span id="macd-val">—</span></span>
+      <span>EMA <span id="ema-val">—</span></span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-holding" onclick="setMode('holding')">💰 Tengo BTC</button>
+    <button class="tab-btn" id="tab-waiting" onclick="setMode('waiting')">⏳ Quiero comprar</button>
+  </div>
+
+  <!-- Panel: Tengo BTC -->
+  <div class="panel" id="panel-holding">
+    <div class="card-label">MI POSICIÓN</div>
+    <div class="input-label">PRECIO AL QUE COMPRÉ (USD)</div>
+    <div class="input-wrap" style="border:1px solid #00e87a55">
+      <span style="color:#00e87a">$</span>
+      <input type="number" id="buy-input" placeholder="ej: 62000" oninput="renderHolding()" />
+    </div>
+    <div id="holding-result"></div>
+  </div>
+
+  <!-- Panel: Quiero comprar -->
+  <div class="panel" id="panel-waiting" style="display:none">
+    <div class="card-label">MI ÚLTIMA VENTA</div>
+    <div class="input-label">PRECIO AL QUE VENDÍ (USD)</div>
+    <div class="input-wrap" style="border:1px solid #ff3d5a55">
+      <span style="color:#ff3d5a">$</span>
+      <input type="number" id="sell-input" placeholder="ej: 71000" oninput="renderWaiting()" />
+    </div>
+    <div id="waiting-result"></div>
+  </div>
+
+  <!-- IA -->
+  <div class="ai-section">
+    <div class="card-label">◈ ANÁLISIS IA PERSONALIZADO</div>
+    <div id="ai-output" class="ai-placeholder">
+      Ingresa tu precio y presiona el botón para análisis personalizado.
+    </div>
+    <button class="ai-btn" id="ai-btn" onclick="askAI()">◈ ANALIZAR CON IA</button>
+  </div>
+
+  <div class="footer">
+    ⚠ NO ES ASESORÍA FINANCIERA · ML: RandomForest 100 árboles<br/>
+    github.com/ernesarevalo/cripto-ai v2 · ACTUALIZA CADA 60S
+  </div>
+
+</div>
 
 <script>
-async function setBuy() {
-  const val = document.getElementById("priceInput").value;
-  await fetch(`/set-buy/${val}`);
+// ── Estado global ─────────────────────────────────────────────────────────
+let signal = null;
+let mode = 'holding';
+let sparkHistory = [];
+
+// ── Fetch señal desde el backend ─────────────────────────────────────────
+async function fetchSignal() {
+  try {
+    const res = await fetch('/api/signal');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    signal = data;
+    updateUI();
+  } catch (e) {
+    document.getElementById('action-display').textContent = '⚠ ERROR: ' + e.message;
+  }
 }
 
-async function setSell() {
-  const val = document.getElementById("priceInput").value;
-  await fetch(`/set-sell/${val}`);
+// ── Actualiza toda la UI ──────────────────────────────────────────────────
+function updateUI() {
+  if (!signal) return;
+  const p = signal.current_price;
+  const sigColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
+
+  // Precio
+  document.getElementById('price-display').textContent = fmt(p);
+  document.getElementById('update-time').textContent = '🟢 ' + new Date().toLocaleTimeString('es-MX');
+
+  // Sparkline (historial local)
+  sparkHistory.push(p);
+  if (sparkHistory.length > 40) sparkHistory.shift();
+  drawSparkline(sparkHistory, sigColor);
+
+  // Señal
+  const card = document.getElementById('signal-card');
+  card.style.border = `1px solid ${sigColor}44`;
+  card.style.boxShadow = `0 0 20px ${sigColor}12`;
+
+  const actionEl = document.getElementById('action-display');
+  actionEl.textContent = signal.action === 'COMPRAR' ? '▲ COMPRAR' : signal.action === 'VENDER' ? '▼ VENDER' : '◆ MANTENER';
+  actionEl.style.color = sigColor;
+  actionEl.style.textShadow = `0 0 14px ${sigColor}55`;
+
+  document.getElementById('confidence-display').innerHTML =
+    `CONFIANZA: <span style="color:${sigColor}">${signal.confidence}%</span>`;
+  document.getElementById('conf-bar').style.width = signal.confidence + '%';
+  document.getElementById('conf-bar').style.background = sigColor;
+
+  // Scores
+  document.getElementById('scores-grid').style.display = 'grid';
+  document.getElementById('ml-gauge').style.display = 'block';
+
+  const tsEl = document.getElementById('tech-score');
+  tsEl.textContent = (signal.tech_score > 0 ? '+' : '') + signal.tech_score.toFixed(1);
+  tsEl.style.color = signal.tech_score > 0 ? '#00e87a' : signal.tech_score < 0 ? '#ff3d5a' : '#f5c842';
+
+  const msEl = document.getElementById('ml-score');
+  msEl.textContent = (signal.ml_score > 0 ? '+' : '') + signal.ml_score.toFixed(1);
+  msEl.style.color = signal.ml_score > 0 ? '#00e87a' : signal.ml_score < 0 ? '#ff3d5a' : '#f5c842';
+
+  // ML gauge
+  const mlPct = Math.min(Math.max((signal.ml_pred + 0.02) / 0.04, 0), 1) * 100;
+  const mlColor = signal.ml_pred > 0.002 ? '#00e87a' : signal.ml_pred < -0.002 ? '#ff3d5a' : '#f5c842';
+  const mlLabel = signal.ml_pred > 0.002 ? 'ALCISTA' : signal.ml_pred < -0.002 ? 'BAJISTA' : 'NEUTRAL';
+  document.getElementById('ml-gauge-fill').style.width = mlPct + '%';
+  document.getElementById('ml-gauge-fill').style.background = mlColor;
+  document.getElementById('ml-gauge-label').textContent =
+    `${mlLabel} (${signal.ml_pred > 0 ? '+' : ''}${(signal.ml_pred * 100).toFixed(3)}%)`;
+  document.getElementById('ml-gauge-label').style.color = mlColor;
+
+  // Indicadores
+  const rsiColor = signal.rsi < 35 ? '#00e87a' : signal.rsi > 65 ? '#ff3d5a' : '#aab';
+  document.getElementById('rsi-val').innerHTML = `<span style="color:${rsiColor}">${signal.rsi}</span>`;
+  document.getElementById('macd-val').innerHTML =
+    `<span style="color:${signal.macd > 0 ? '#00e87a' : '#ff3d5a'}">${signal.macd > 0 ? '▲' : '▼'}</span>`;
+
+  // Re-render panels
+  renderHolding();
+  renderWaiting();
 }
 
-async function loadData() {
-  const res = await fetch("/btc");
-  const d = await res.json();
+// ── Rendering de paneles ─────────────────────────────────────────────────
+function renderHolding() {
+  const myBuy = parseFloat(document.getElementById('buy-input').value) || null;
+  const el = document.getElementById('holding-result');
+  if (!myBuy || !signal) { el.innerHTML = ''; return; }
+  const p = signal.current_price;
+  const pnlPct = pct(myBuy, p);
+  const pnlAbs = p - myBuy;
+  const sigColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
+  const pnlColor = pnlAbs >= 0 ? '#00e87a' : '#ff3d5a';
 
-  document.getElementById("price").innerText =
-    "BTC: " + d.current.toFixed(2);
-
-  document.getElementById("prediction").innerText =
-    "Prediction: " + (d.prediction * 100).toFixed(2) + "%";
-
-  document.getElementById("rsi").innerText =
-    "RSI: " + d.rsi.toFixed(2);
-
-  // 🧠 LINEA PRINCIPAL
-  const line = document.getElementById("positionLine");
-
-  if (d.position === "BUY") {
-    const pct = d.percent.toFixed(2);
-    line.innerText = `Precio Compra: ${d.buy} - ${pct}%`;
-    line.className = "big " + (pct >= 0 ? "positive" : "negative");
-  }
-
-  if (d.position === "SELL") {
-    const pct = d.percent.toFixed(2);
-    line.innerText = `Precio Venta: ${d.sell} - ${pct}%`;
-    line.className = "big " + (pct >= 0 ? "positive" : "negative");
-  }
-
-  if (!d.position) {
-    line.innerText = "";
-  }
-
-  const signalEl = document.getElementById("signal");
-  signalEl.innerText = d.signal;
-
-  signalEl.className = "big " +
-    (d.signal === "BUY" ? "buy" :
-     d.signal === "SELL" ? "sell" : "wait");
+  el.innerHTML = `
+    <div class="metric" style="background:${pnlColor}0d;border:1px solid ${pnlColor}33">
+      <div class="metric-row">
+        <div>
+          <div class="metric-label">P&L ACTUAL</div>
+          <div class="metric-value" style="color:${pnlColor}">${pnlAbs>=0?'+':''}${pnlPct}%</div>
+          <div class="metric-sub">${pnlAbs>=0?'+':''}${fmt(pnlAbs)} por BTC</div>
+        </div>
+        <div class="metric-right">
+          <div class="lbl">COMPRASTE</div><div class="val" style="color:#99a">${fmt(myBuy)}</div>
+          <div class="lbl" style="margin-top:10px">AHORA</div><div class="val" style="color:#fff">${fmt(p)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="target-box" style="background:#00e87a0d;border:1px solid #00e87a33">
+      <div class="target-label" style="color:#00e87a">🎯 VENDER CUANDO LLEGUE A</div>
+      <div class="metric-row">
+        <div>
+          <div class="target-price" style="color:#00e87a">${fmt(signal.sell_target)}</div>
+          <div class="target-pct">+${pct(myBuy, signal.sell_target)}% desde tu entrada</div>
+        </div>
+        <div class="target-bb">
+          <div>BB sup: ${fmt(signal.bb.upper)}</div>
+          <div>BB med: ${fmt(signal.bb.middle)}</div>
+        </div>
+      </div>
+      <div class="target-tip">
+        ${signal.action==='VENDER' ? '⚠️ ML + técnico indican VENTA. Considera cerrar posición.'
+          : signal.action==='COMPRAR' ? '✅ ML + técnico alcistas. Mantén hasta el objetivo.'
+          : '📊 Señales mixtas. Mantén y espera confirmación.'}
+      </div>
+    </div>`;
 }
 
-setInterval(loadData, 5000);
-loadData();
+function renderWaiting() {
+  const mySell = parseFloat(document.getElementById('sell-input').value) || null;
+  const el = document.getElementById('waiting-result');
+  if (!mySell || !signal) { el.innerHTML = ''; return; }
+  const p = signal.current_price;
+  const potPct = pct(mySell, p);
+  const diff = p - mySell;
+  const downColor = p < mySell ? '#00e87a' : '#ff3d5a';
+  const dotColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
+
+  el.innerHTML = `
+    <div class="metric" style="background:${downColor}0d;border:1px solid ${downColor}33">
+      <div class="metric-row">
+        <div>
+          <div class="metric-label">VS TU VENTA</div>
+          <div class="metric-value" style="color:${downColor}">${potPct}%</div>
+          <div class="metric-sub">${p < mySell ? 'BTC bajó ' + fmt(Math.abs(diff)) + ' ✅' : 'BTC subió ' + fmt(diff) + ' ⚠️'}</div>
+        </div>
+        <div class="metric-right">
+          <div class="lbl">VENDISTE A</div><div class="val" style="color:#99a">${fmt(mySell)}</div>
+          <div class="lbl" style="margin-top:10px">AHORA</div><div class="val" style="color:#fff">${fmt(p)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="target-box" style="background:#f5c8420d;border:1px solid #f5c84233">
+      <div class="target-label" style="color:#f5c842">🎯 COMPRAR CUANDO LLEGUE A</div>
+      <div class="metric-row">
+        <div>
+          <div class="target-price" style="color:#f5c842">${fmt(signal.buy_target)}</div>
+          <div class="target-pct">${pct(mySell, signal.buy_target)}% vs tu venta</div>
+        </div>
+        <div class="target-bb">
+          <div>BB inf: ${fmt(signal.bb.lower)}</div>
+          <div>BB med: ${fmt(signal.bb.middle)}</div>
+        </div>
+      </div>
+      <div class="target-tip">
+        ${signal.action==='COMPRAR' ? '✅ ML + técnico confirman compra. Buen momento para entrar.'
+          : signal.action==='VENDER' ? '⏳ ML predice más caída. Espera al precio objetivo.'
+          : '📊 Señales neutrales. Entra con una posición pequeña.'}
+      </div>
+    </div>
+    <div class="semaforo">
+      <div class="semaforo-dot" style="background:${dotColor};box-shadow:0 0 10px ${dotColor}"></div>
+      <div class="semaforo-text">
+        <strong style="color:#aab">¿Comprar ahora?</strong>
+        ${signal.action==='COMPRAR' ? ' Sí — ML y técnicos confirman entrada.'
+          : signal.action==='VENDER' ? ' No — el modelo predice más caída.'
+          : ' Con cautela — espera señal más clara.'}
+      </div>
+    </div>`;
+}
+
+// ── Análisis IA ───────────────────────────────────────────────────────────
+async function askAI() {
+  if (!signal) return;
+  const btn = document.getElementById('ai-btn');
+  const out = document.getElementById('ai-output');
+  btn.disabled = true;
+  btn.textContent = '◈ ANALIZANDO···';
+  out.className = 'ai-placeholder';
+  out.textContent = 'Generando análisis…';
+
+  const body = {
+    signal,
+    mode,
+    myBuy: parseFloat(document.getElementById('buy-input').value) || null,
+    mySell: parseFloat(document.getElementById('sell-input').value) || null,
+  };
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    out.className = 'ai-text';
+    out.textContent = data.analysis ?? 'Sin respuesta.';
+  } catch {
+    out.textContent = 'Error de conexión.';
+  }
+  btn.disabled = false;
+  btn.textContent = '◈ ANALIZAR CON IA';
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('panel-holding').style.display = m === 'holding' ? 'block' : 'none';
+  document.getElementById('panel-waiting').style.display = m === 'waiting' ? 'block' : 'none';
+  document.getElementById('tab-holding').className = 'tab-btn' + (m === 'holding' ? ' active' : '');
+  document.getElementById('tab-waiting').className = 'tab-btn' + (m === 'waiting' ? ' active' : '');
+  document.getElementById('ai-output').textContent = 'Ingresa tu precio y presiona el botón para análisis personalizado.';
+  document.getElementById('ai-output').className = 'ai-placeholder';
+}
+
+// ── Sparkline SVG ─────────────────────────────────────────────────────────
+function drawSparkline(prices, color) {
+  if (prices.length < 2) return;
+  const W = 110, H = 34;
+  const mn = Math.min(...prices), mx = Math.max(...prices), r = mx - mn || 1;
+  const pts = prices.map((p, i) =>
+    `${(i/(prices.length-1))*W},${H-((p-mn)/r)*(H-3)+1}`
+  ).join(' ');
+  document.getElementById('sparkline').innerHTML = `
+    <defs>
+      <linearGradient id="slg" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="1"/>
+      </linearGradient>
+    </defs>
+    <polyline points="${pts}" fill="none" stroke="url(#slg)" stroke-width="1.8" stroke-linejoin="round"/>`;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function fmt(n, d=0) {
+  if (n == null || isNaN(n)) return '—';
+  return '$' + Number(n).toLocaleString('es-MX', {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function pct(a, b) {
+  if (!a || !b) return '0.00';
+  return ((b-a)/a*100).toFixed(2);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+fetchSignal();
+setInterval(fetchSignal, 60000);
 </script>
-
 </body>
 </html>

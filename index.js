@@ -1,125 +1,106 @@
 import express from "express";
-import fetch from "node-fetch";
-import { execSync } from "child_process";
-import fs from "fs";
+import { spawn } from "child_process";
+import path from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.static("public"));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
-const DATA_FILE = "./data.json";
+// Cache simple para no correr el modelo en cada request
+let cache = { data: null, timestamp: 0 };
+const CACHE_TTL = 60 * 1000; // 60 segundos
 
-function loadData() {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE));
-  } catch {
-    return {};
-  }
-}
+// ── /api/signal ── Corre model_runner.py y devuelve señal ML
+app.get("/api/signal", (req, res) => {
+  const now = Date.now();
 
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-async function getPrices() {
-  const res = await fetch(
-    "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=7"
-  );
-
-  const data = await res.json();
-
-  if (!data.prices) throw new Error("API failed");
-
-  return data.prices.map(p => p[1]);
-}
-
-function calculateRSI(prices, period = 14) {
-  let gains = 0, losses = 0;
-
-  for (let i = prices.length - period; i < prices.length - 1; i++) {
-    const diff = prices[i + 1] - prices[i];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
+  // Devuelve caché si es reciente
+  if (cache.data && now - cache.timestamp < CACHE_TTL) {
+    return res.json({ ...cache.data, cached: true });
   }
 
-  const rs = gains / (losses || 1);
-  return 100 - (100 / (1 + rs));
-}
+  const python = spawn("python3", ["model_runner.py"], {
+    cwd: __dirname,
+    timeout: 60000,
+  });
 
-function getSignal(prediction, rsi) {
-  if (prediction > 0.015 && rsi < 65) return "BUY";
-  if (prediction < -0.015 && rsi > 60) return "SELL";
-  return "WAIT";
-}
+  let stdout = "";
+  let stderr = "";
 
-app.get("/btc", async (req, res) => {
-  try {
-    const prices = await getPrices();
-    const current = prices[prices.length - 1];
+  python.stdout.on("data", (d) => (stdout += d.toString()));
+  python.stderr.on("data", (d) => (stderr += d.toString()));
 
-    let prediction = 0;
-
+  python.on("close", (code) => {
+    if (code !== 0) {
+      console.error("Python error:", stderr);
+      return res.status(500).json({ error: "model_error", detail: stderr });
+    }
     try {
-      prediction = parseFloat(
-        execSync("python3 model_runner.py").toString().trim()
-      );
-    } catch {}
-
-    const rsi = calculateRSI(prices);
-
-    const data = loadData();
-
-    let position = null;
-    let percent = null;
-
-    if (data.buy) {
-      position = "BUY";
-      percent = ((current - data.buy) / data.buy) * 100;
+      const result = JSON.parse(stdout.trim());
+      if (result.error) {
+        return res.status(500).json(result);
+      }
+      cache = { data: result, timestamp: now };
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: "parse_error", raw: stdout });
     }
+  });
+});
 
-    if (data.sell) {
-      position = "SELL";
-      percent = ((data.sell - current) / data.sell) * 100;
-    }
+// ── /api/analyze ── Análisis IA personalizado vía Claude API
+app.post("/api/analyze", async (req, res) => {
+  const { signal, myBuy, mySell, mode } = req.body;
 
-    const signal = getSignal(prediction, rsi);
+  if (!signal) return res.status(400).json({ error: "missing_signal" });
 
-    res.json({
-      current,
-      prediction,
-      rsi,
-      signal,
-      position,
-      percent,
-      buy: data.buy || null,
-      sell: data.sell || null
+  const ctx =
+    mode === "holding" && myBuy
+      ? `El usuario compró BTC a $${myBuy}. Precio actual: $${signal.current_price}. Target venta: $${signal.sell_target}.`
+      : mode === "waiting" && mySell
+      ? `El usuario vendió BTC a $${mySell}. Precio actual: $${signal.current_price}. Target recompra: $${signal.buy_target}.`
+      : `Precio actual BTC: $${signal.current_price}.`;
+
+  const prompt = `Eres un trader experto en Bitcoin. Responde en español, 3 oraciones directas, sin asteriscos ni markdown.
+
+Contexto: ${ctx}
+RSI: ${signal.rsi}, MACD: ${signal.macd > 0 ? "positivo" : "negativo"}, Predicción ML: ${signal.ml_pred > 0 ? "+" : ""}${(signal.ml_pred * 100).toFixed(3)}%, Señal: ${signal.action} con ${signal.confidence}% confianza.
+
+1) Estado actual del mercado. 2) Qué debe hacer el usuario AHORA. 3) Precio clave a vigilar.`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 350,
+        messages: [{ role: "user", content: prompt }],
+      }),
     });
-
-  } catch (err) {
-    res.json({ error: err.toString() });
+    const data = await response.json();
+    const text =
+      data.content?.filter((b) => b.type === "text").map((b) => b.text).join("") ??
+      "Sin respuesta.";
+    res.json({ analysis: text });
+  } catch (e) {
+    res.status(500).json({ error: "ai_error", detail: e.message });
   }
 });
 
-app.get("/set-buy/:price", (req, res) => {
-  const data = loadData();
+// Fallback → index.html
+app.get("*", (_, res) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
-  data.buy = parseFloat(req.params.price);
-  delete data.sell; // 🔥 BORRA venta
-
-  saveData(data);
-
-  res.send("Buy saved");
+app.listen(PORT, () => {
+  console.log(`✅ cripto-ai v2 corriendo en http://localhost:${PORT}`);
 });
-
-app.get("/set-sell/:price", (req, res) => {
-  const data = loadData();
-
-  data.sell = parseFloat(req.params.price);
-  delete data.buy; // 🔥 BORRA compra
-
-  saveData(data);
-
-  res.send("Sell saved");
-});
-
-app.listen(3000, () => console.log("Running on port 3000"));
