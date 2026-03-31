@@ -5,140 +5,157 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BTC Oracle — cripto-ai v2</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #00e87a;
+      --red:    #ff3d5a;
+      --yellow: #f5c842;
+      --blue:   #3366ff;
+      --bg:     #060912;
+      --card:   #0b1020;
+      --border: #1a2540;
+      --dim:    #2a3a55;
+      --muted:  #445577;
+    }
 
     body {
       min-height: 100vh;
-      background: #060912;
+      background: var(--bg);
       color: #ccd;
       font-family: 'Courier New', monospace;
-      padding: 16px 14px;
+      padding: 16px 14px 32px;
     }
 
     .app { max-width: 460px; margin: 0 auto; }
 
-    /* Header */
+    /* ── Header ── */
     .header { text-align: center; margin-bottom: 18px; }
-    .header-tag { font-size: 10px; letter-spacing: 6px; color: #3366ff; margin-bottom: 3px; }
-    .header-sub { font-size: 8px; color: #2a3a55; letter-spacing: 4px; }
+    .header-tag { font-size: 10px; letter-spacing: 6px; color: var(--blue); margin-bottom: 3px; }
+    .header-sub { font-size: 8px; color: var(--dim); letter-spacing: 4px; }
 
-    /* Cards */
+    /* ── Card base ── */
     .card {
-      background: #0b1020;
-      border: 1px solid #1a2540;
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
     }
-    .card-label {
-      font-size: 9px;
-      color: #3366ff;
-      letter-spacing: 3px;
-      margin-bottom: 8px;
-    }
+    .card-label { font-size: 9px; color: var(--blue); letter-spacing: 3px; margin-bottom: 8px; }
 
-    /* Price */
+    /* ── Price ── */
     .price-row { display: flex; justify-content: space-between; align-items: flex-start; }
-    .price-value { font-size: 34px; font-weight: bold; color: #fff; letter-spacing: -1px; }
+    .price-value {
+      font-size: 34px; font-weight: bold; color: #fff; letter-spacing: -1px;
+      transition: text-shadow 0.4s;
+    }
+    .price-value.glow-green { text-shadow: 0 0 22px var(--green); }
+    .price-value.glow-red   { text-shadow: 0 0 22px var(--red); }
     .price-change { font-size: 12px; margin-top: 4px; }
-    .price-meta { font-size: 8px; color: #2a3a55; margin-top: 4px; text-align: right; }
+    .price-meta { font-size: 8px; color: var(--dim); margin-top: 4px; text-align: right; }
+    .ws-dot {
+      display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px var(--green);
+      animation: blink 2s ease-in-out infinite; margin-right: 4px; vertical-align: middle;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-    /* Sparkline */
-    #sparkline { display: block; }
+    @keyframes flash-green { 0%{background:#00e87a22} 100%{background:transparent} }
+    @keyframes flash-red   { 0%{background:#ff3d5a22} 100%{background:transparent} }
+    .flash-green { animation: flash-green 0.6s ease-out; border-radius: 14px; }
+    .flash-red   { animation: flash-red   0.6s ease-out; border-radius: 14px; }
 
-    /* Signal */
+    /* ── Signal ── */
     .signal-card { transition: box-shadow 0.5s, border-color 0.5s; }
     .signal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .signal-confidence { font-size: 9px; color: #445577; }
-    .signal-action { font-size: 28px; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px; transition: color 0.5s; }
+    .signal-confidence { font-size: 9px; color: var(--muted); }
+    .signal-action {
+      font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-bottom: 8px;
+      transition: color 0.4s, text-shadow 0.4s; min-height: 36px;
+    }
     .signal-bar-track { height: 3px; background: #0a1525; border-radius: 2px; margin-bottom: 10px; }
-    .signal-bar-fill { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
-    .indicators { display: flex; gap: 14px; font-size: 10px; color: #445577; }
+    .signal-bar-fill  { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
+    .indicators { display: flex; gap: 14px; font-size: 10px; color: var(--muted); flex-wrap: wrap; }
 
-    /* Scores grid */
+    /* ── Scores ── */
     .scores-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
     .score-box { background: #080f20; border-radius: 8px; padding: 8px 10px; }
-    .score-box-label { font-size: 8px; color: #445577; letter-spacing: 2px; margin-bottom: 3px; }
+    .score-box-label { font-size: 8px; color: var(--muted); letter-spacing: 2px; margin-bottom: 3px; }
     .score-box-value { font-size: 16px; font-weight: bold; }
 
-    /* ML gauge */
+    /* ── ML Gauge ── */
     .ml-gauge { background: #080f20; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
     .ml-gauge-label { font-size: 9px; color: #446; letter-spacing: 2px; margin-bottom: 4px; }
-    .ml-gauge-bar { height: 4px; background: #0a1525; border-radius: 2px; margin-bottom: 4px; }
-    .ml-gauge-fill { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
-    .ml-gauge-row { display: flex; justify-content: space-between; font-size: 9px; color: #334; }
+    .ml-gauge-bar   { height: 4px; background: #0a1525; border-radius: 2px; margin-bottom: 4px; }
+    .ml-gauge-fill  { height: 100%; border-radius: 2px; transition: width 1s, background 0.5s; }
+    .ml-gauge-row   { display: flex; justify-content: space-between; font-size: 9px; color: #334; }
 
-    /* Tabs */
-    .tabs { display: flex; background: #0b1020; border: 1px solid #1a2540; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
-    .tab-btn {
-      flex: 1; padding: 11px 8px; border: none; cursor: pointer;
-      font-family: inherit; font-size: 11px;
-      background: transparent; color: #334;
-      border-bottom: 2px solid transparent;
-      transition: all 0.2s;
+    /* ── Op panel ── */
+    .op-panel {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px; margin-bottom: 10px;
     }
-    .tab-btn.active { background: #152035; color: #6699ff; border-bottom-color: #3366ff; }
-
-    /* Panel */
-    .panel { background: #0b1020; border: 1px solid #1a2540; border-radius: 14px; padding: 16px; margin-bottom: 10px; }
-
-    /* Input */
+    .op-panel-title { font-size: 9px; color: var(--blue); letter-spacing: 3px; margin-bottom: 12px; }
     .input-label { font-size: 9px; color: #4466aa; letter-spacing: 3px; margin-bottom: 6px; }
     .input-wrap {
       display: flex; align-items: center; gap: 8px;
-      background: #070d1a; border-radius: 10px; padding: 10px 14px;
+      background: #070d1a; border: 1px solid #1a3a5a;
+      border-radius: 10px; padding: 10px 14px; transition: border-color 0.3s;
     }
-    .input-wrap span { font-size: 14px; font-weight: bold; }
+    .input-wrap:focus-within { border-color: var(--blue); }
+    .input-wrap span { font-size: 14px; font-weight: bold; color: var(--blue); }
     .input-wrap input {
       background: transparent; border: none; outline: none;
       color: #dde; font-size: 16px; font-family: inherit; width: 100%;
     }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-    /* Metric cards */
-    .metric { border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
-    .metric-label { font-size: 9px; color: #446; letter-spacing: 2px; margin-bottom: 4px; }
-    .metric-value { font-size: 26px; font-weight: bold; margin-top: 4px; }
-    .metric-sub { font-size: 10px; color: #667; margin-top: 2px; }
-    .metric-row { display: flex; justify-content: space-between; align-items: center; }
-    .metric-right { text-align: right; font-size: 11px; }
-    .metric-right .lbl { font-size: 9px; color: #446; }
-    .metric-right .val { margin-top: 3px; }
-    .target-box { border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
-    .target-label { font-size: 9px; letter-spacing: 2px; margin-bottom: 8px; }
-    .target-price { font-size: 26px; font-weight: bold; }
-    .target-pct { font-size: 10px; color: #445; margin-top: 3px; }
-    .target-bb { text-align: right; font-size: 10px; color: #446; line-height: 2.2; }
-    .target-tip { margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a2a3a; font-size: 10px; color: #667; }
-
-    /* Semaforo */
-    .semaforo { display: flex; align-items: center; gap: 12px; background: #070d1a; border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
-    .semaforo-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-    .semaforo-text { font-size: 10px; color: #778; line-height: 1.5; }
-
-    /* Empty state */
-    .empty { font-size: 10px; color: #2a3a50; text-align: center; padding: 20px 0; }
-
-    /* AI section */
-    .ai-section { background: #0b1020; border: 1px solid #1a2540; border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
-    .ai-text { font-size: 12px; color: #aab; line-height: 1.9; }
-    .ai-placeholder { font-size: 10px; color: #2a3a50; }
-    .ai-btn {
-      margin-top: 10px; padding: 9px 18px;
-      background: transparent; border: 1px solid #3366ff55;
-      border-radius: 8px; color: #4477ff;
-      font-family: inherit; font-size: 9px; letter-spacing: 2px;
+    /* ── Op buttons ── */
+    .op-btns { display: flex; gap: 8px; margin-top: 10px; }
+    .op-btn {
+      flex: 1; padding: 11px 0; border: 1px solid transparent; border-radius: 10px;
+      font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 2px;
       cursor: pointer; transition: all 0.2s;
     }
-    .ai-btn:disabled { color: #2a3a55; cursor: not-allowed; }
+    .op-btn-buy  { background: #00e87a0f; border-color: #00e87a44; color: var(--green); }
+    .op-btn-sell { background: #ff3d5a0f; border-color: #ff3d5a44; color: var(--red); }
+    .op-btn-buy:hover,  .op-btn-buy.active  { background: #00e87a22; border-color: var(--green); box-shadow: 0 0 14px #00e87a33; }
+    .op-btn-sell:hover, .op-btn-sell.active { background: #ff3d5a22; border-color: var(--red);   box-shadow: 0 0 14px #ff3d5a33; }
 
-    /* Footer */
+    /* ── Op result line ── */
+    .op-result {
+      margin-top: 12px; font-size: 14px; font-weight: bold; letter-spacing: 1px;
+      min-height: 22px; transition: color 0.3s;
+    }
+    .op-result.positive { color: var(--green); }
+    .op-result.negative { color: var(--red); }
+
+    /* ── Target box ── */
+    .target-box { border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+    .target-label { font-size: 9px; letter-spacing: 2px; margin-bottom: 8px; }
+    .target-row { display: flex; justify-content: space-between; align-items: center; }
+    .target-price { font-size: 24px; font-weight: bold; }
+    .target-pct { font-size: 10px; color: #445; margin-top: 3px; }
+    .target-bb { text-align: right; font-size: 10px; color: #446; line-height: 2; }
+    .target-tip { margin-top: 10px; padding-top: 10px; border-top: 1px solid #1a2a3a; font-size: 10px; color: #778; line-height: 1.6; }
+
+    /* ── AI ── */
+    .ai-section {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px 16px; margin-bottom: 10px;
+    }
+    .ai-output      { font-size: 12px; color: #aab; line-height: 1.9; }
+    .ai-placeholder { font-size: 10px; color: var(--dim); }
+    .ai-btn {
+      margin-top: 10px; padding: 9px 18px;
+      background: transparent; border: 1px solid #3366ff55; border-radius: 8px;
+      color: #4477ff; font-family: inherit; font-size: 9px; letter-spacing: 2px;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .ai-btn:hover:not(:disabled) { background: #3366ff11; border-color: var(--blue); }
+    .ai-btn:disabled { color: var(--dim); cursor: not-allowed; }
+
+    /* ── Footer ── */
     .footer { text-align: center; font-size: 8px; color: #1a2535; line-height: 2.2; letter-spacing: 1px; }
-
-    /* Spinner */
-    .spinner { display: inline-block; animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .loading-state { font-size: 13px; color: #3366ff; margin: 8px 0; }
   </style>
 </head>
 <body>
@@ -155,20 +172,20 @@
     <div class="price-row">
       <div>
         <div class="card-label">BITCOIN / USD</div>
-        <div class="price-value" id="price-display">Cargando…</div>
+        <div class="price-value" id="price-display">Conectando…</div>
         <div class="price-change" id="change-display"></div>
       </div>
       <div>
         <svg id="sparkline" width="110" height="34"></svg>
-        <div class="price-meta" id="update-time"></div>
+        <div class="price-meta" id="update-time">— Binance WS</div>
       </div>
     </div>
   </div>
 
-  <!-- Señal -->
+  <!-- Señal combinada -->
   <div class="card signal-card" id="signal-card">
     <div class="signal-header">
-      <div class="card-label">SEÑAL COMBINADA ML + TÉCNICO</div>
+      <div class="card-label">SEÑAL ML + TÉCNICO + USUARIO</div>
       <div class="signal-confidence" id="confidence-display">—</div>
     </div>
     <div class="signal-action" id="action-display">⚙ CARGANDO···</div>
@@ -176,7 +193,6 @@
       <div class="signal-bar-fill" id="conf-bar" style="width:0%"></div>
     </div>
 
-    <!-- Scores -->
     <div class="scores-grid" id="scores-grid" style="display:none">
       <div class="score-box">
         <div class="score-box-label">SCORE TÉCNICO</div>
@@ -188,323 +204,469 @@
       </div>
     </div>
 
-    <!-- ML Gauge -->
     <div class="ml-gauge" id="ml-gauge" style="display:none">
-      <div class="ml-gauge-label">PREDICCIÓN ML</div>
+      <div class="ml-gauge-label">PREDICCIÓN ML (RandomForest)</div>
       <div class="ml-gauge-bar">
         <div class="ml-gauge-fill" id="ml-gauge-fill" style="width:50%"></div>
       </div>
       <div class="ml-gauge-row">
-        <span style="color:#ff3d5a">BAJA</span>
+        <span style="color:var(--red)">BAJA</span>
         <span id="ml-gauge-label" style="font-weight:bold">NEUTRAL</span>
-        <span style="color:#00e87a">SUBE</span>
+        <span style="color:var(--green)">SUBE</span>
       </div>
     </div>
 
-    <div class="indicators" id="indicators">
+    <div class="indicators">
       <span>RSI <span id="rsi-val">—</span></span>
       <span>MACD <span id="macd-val">—</span></span>
-      <span>EMA <span id="ema-val">—</span></span>
+      <span>BB <span id="bb-val">—</span></span>
     </div>
   </div>
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-holding" onclick="setMode('holding')">💰 Tengo BTC</button>
-    <button class="tab-btn" id="tab-waiting" onclick="setMode('waiting')">⏳ Quiero comprar</button>
-  </div>
+  <!-- Mi operación -->
+  <div class="op-panel">
+    <div class="op-panel-title">MI OPERACIÓN</div>
 
-  <!-- Panel: Tengo BTC -->
-  <div class="panel" id="panel-holding">
-    <div class="card-label">MI POSICIÓN</div>
-    <div class="input-label">PRECIO AL QUE COMPRÉ (USD)</div>
-    <div class="input-wrap" style="border:1px solid #00e87a55">
-      <span style="color:#00e87a">$</span>
-      <input type="number" id="buy-input" placeholder="ej: 62000" oninput="renderHolding()" />
+    <div class="input-label">PRECIO DE ENTRADA (USD)</div>
+    <div class="input-wrap">
+      <span>$</span>
+      <input
+        type="number"
+        id="precio-input"
+        placeholder="ej: 62000"
+        oninput="onPrecioChange()"
+      />
     </div>
-    <div id="holding-result"></div>
-  </div>
 
-  <!-- Panel: Quiero comprar -->
-  <div class="panel" id="panel-waiting" style="display:none">
-    <div class="card-label">MI ÚLTIMA VENTA</div>
-    <div class="input-label">PRECIO AL QUE VENDÍ (USD)</div>
-    <div class="input-wrap" style="border:1px solid #ff3d5a55">
-      <span style="color:#ff3d5a">$</span>
-      <input type="number" id="sell-input" placeholder="ej: 71000" oninput="renderWaiting()" />
+    <div class="op-btns">
+      <button class="op-btn op-btn-buy"  id="btn-compre" onclick="registrarOperacion('compra')">▲ COMPRÉ</button>
+      <button class="op-btn op-btn-sell" id="btn-vendi"  onclick="registrarOperacion('venta')">▼ VENDÍ</button>
     </div>
-    <div id="waiting-result"></div>
+
+    <!-- Línea dinámica única — se actualiza en cada tick -->
+    <div class="op-result" id="op-result"></div>
+
+    <!-- Detalle: target + tip -->
+    <div id="op-detail"></div>
   </div>
 
-  <!-- IA -->
+  <!-- Análisis IA -->
   <div class="ai-section">
     <div class="card-label">◈ ANÁLISIS IA PERSONALIZADO</div>
     <div id="ai-output" class="ai-placeholder">
-      Ingresa tu precio y presiona el botón para análisis personalizado.
+      Registra tu operación y presiona Analizar para recibir un análisis personalizado.
     </div>
-    <button class="ai-btn" id="ai-btn" onclick="askAI()">◈ ANALIZAR CON IA</button>
+    <button class="ai-btn" id="ai-btn" onclick="analizarConIA()">◈ ANALIZAR CON IA</button>
   </div>
 
   <div class="footer">
     ⚠ NO ES ASESORÍA FINANCIERA · ML: RandomForest 100 árboles<br/>
-    github.com/ernesarevalo/cripto-ai v2 · ACTUALIZA CADA 60S
+    PRECIO VÍA BINANCE WEBSOCKET · cripto-ai v2
   </div>
 
-</div>
+</div><!-- /.app -->
 
 <script>
-// ── Estado global ─────────────────────────────────────────────────────────
-let signal = null;
-let mode = 'holding';
-let sparkHistory = [];
+// ═══════════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════════════
+let signal        = null;   // respuesta de /api/signal
+let currentPrice  = null;   // precio en tiempo real
+let prevPrice     = null;
+let sparkHistory  = [];
+let tipoOperacion = null;   // "compra" | "venta"
+let precioUsuario = null;
+let wsReconnect   = null;
 
-// ── Fetch señal desde el backend ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  WEBSOCKET BINANCE — tiempo real
+// ═══════════════════════════════════════════════════════════════════
+function connectWS() {
+  const ws = new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+
+  ws.onopen = () => {
+    document.getElementById('update-time').innerHTML =
+      '<span class="ws-dot"></span>LIVE · Binance';
+    if (wsReconnect) { clearTimeout(wsReconnect); wsReconnect = null; }
+  };
+
+  ws.onmessage = (evt) => {
+    const d = JSON.parse(evt.data);
+    const p = parseFloat(d.p);
+    if (!p || isNaN(p)) return;
+
+    prevPrice    = currentPrice;
+    currentPrice = p;
+    sparkHistory.push(p);
+    if (sparkHistory.length > 80) sparkHistory.shift();
+
+    renderPrice(p);
+    updateOpResult();
+    updateUserSignal();
+  };
+
+  ws.onerror = () => ws.close();
+  ws.onclose = () => {
+    document.getElementById('update-time').textContent = '↻ Reconectando…';
+    wsReconnect = setTimeout(connectWS, 3000);
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  FETCH señal ML (backend)
+// ═══════════════════════════════════════════════════════════════════
 async function fetchSignal() {
   try {
-    const res = await fetch('/api/signal');
+    const res  = await fetch('/api/signal');
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     signal = data;
-    updateUI();
+    if (!currentPrice) { currentPrice = data.current_price; sparkHistory.push(currentPrice); }
+    renderSignalBase();
+    updateOpResult();
+    updateUserSignal();
   } catch (e) {
     document.getElementById('action-display').textContent = '⚠ ERROR: ' + e.message;
   }
 }
 
-// ── Actualiza toda la UI ──────────────────────────────────────────────────
-function updateUI() {
+// ═══════════════════════════════════════════════════════════════════
+//  RENDER: precio con glow + flash
+// ═══════════════════════════════════════════════════════════════════
+function renderPrice(p) {
+  const el   = document.getElementById('price-display');
+  const card = document.getElementById('price-card');
+  const dir  = prevPrice === null ? 'flat' : p > prevPrice ? 'up' : p < prevPrice ? 'down' : 'flat';
+
+  el.textContent = fmt(p);
+  el.classList.remove('glow-green', 'glow-red');
+  card.classList.remove('flash-green', 'flash-red');
+
+  if (dir === 'up') {
+    el.classList.add('glow-green');
+    void card.offsetWidth;
+    card.classList.add('flash-green');
+  } else if (dir === 'down') {
+    el.classList.add('glow-red');
+    void card.offsetWidth;
+    card.classList.add('flash-red');
+  }
+
+  if (signal) {
+    const c = sigHex(signal.action);
+    drawSparkline(sparkHistory, c);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  RENDER: señal ML/técnica base (sin contexto usuario)
+// ═══════════════════════════════════════════════════════════════════
+function renderSignalBase() {
   if (!signal) return;
-  const p = signal.current_price;
-  const sigColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
+  const hex = sigHex(signal.action);
+  const css = sigCss(signal.action);
 
-  // Precio
-  document.getElementById('price-display').textContent = fmt(p);
-  document.getElementById('update-time').textContent = '🟢 ' + new Date().toLocaleTimeString('es-MX');
+  setCardStyle(hex);
 
-  // Sparkline (historial local)
-  sparkHistory.push(p);
-  if (sparkHistory.length > 40) sparkHistory.shift();
-  drawSparkline(sparkHistory, sigColor);
-
-  // Señal
-  const card = document.getElementById('signal-card');
-  card.style.border = `1px solid ${sigColor}44`;
-  card.style.boxShadow = `0 0 20px ${sigColor}12`;
-
-  const actionEl = document.getElementById('action-display');
-  actionEl.textContent = signal.action === 'COMPRAR' ? '▲ COMPRAR' : signal.action === 'VENDER' ? '▼ VENDER' : '◆ MANTENER';
-  actionEl.style.color = sigColor;
-  actionEl.style.textShadow = `0 0 14px ${sigColor}55`;
+  if (!tipoOperacion) {
+    setAction(
+      signal.action === 'COMPRAR' ? '▲ COMPRAR' :
+      signal.action === 'VENDER'  ? '▼ VENDER'  : '◆ MANTENER',
+      css, hex
+    );
+  }
 
   document.getElementById('confidence-display').innerHTML =
-    `CONFIANZA: <span style="color:${sigColor}">${signal.confidence}%</span>`;
-  document.getElementById('conf-bar').style.width = signal.confidence + '%';
-  document.getElementById('conf-bar').style.background = sigColor;
+    `CONFIANZA: <span style="color:${css}">${signal.confidence}%</span>`;
+  document.getElementById('conf-bar').style.cssText =
+    `width:${signal.confidence}%;background:${hex}`;
 
-  // Scores
+  // Scores grid
   document.getElementById('scores-grid').style.display = 'grid';
-  document.getElementById('ml-gauge').style.display = 'block';
+  document.getElementById('ml-gauge').style.display    = 'block';
 
-  const tsEl = document.getElementById('tech-score');
-  tsEl.textContent = (signal.tech_score > 0 ? '+' : '') + signal.tech_score.toFixed(1);
-  tsEl.style.color = signal.tech_score > 0 ? '#00e87a' : signal.tech_score < 0 ? '#ff3d5a' : '#f5c842';
+  const setScore = (id, val) => {
+    const el = document.getElementById(id);
+    el.textContent = (val > 0 ? '+' : '') + val.toFixed(1);
+    el.style.color = val > 0 ? '#00e87a' : val < 0 ? '#ff3d5a' : '#f5c842';
+  };
+  setScore('tech-score', signal.tech_score);
+  setScore('ml-score',   signal.ml_score);
 
-  const msEl = document.getElementById('ml-score');
-  msEl.textContent = (signal.ml_score > 0 ? '+' : '') + signal.ml_score.toFixed(1);
-  msEl.style.color = signal.ml_score > 0 ? '#00e87a' : signal.ml_score < 0 ? '#ff3d5a' : '#f5c842';
-
-  // ML gauge
-  const mlPct = Math.min(Math.max((signal.ml_pred + 0.02) / 0.04, 0), 1) * 100;
-  const mlColor = signal.ml_pred > 0.002 ? '#00e87a' : signal.ml_pred < -0.002 ? '#ff3d5a' : '#f5c842';
+  // ML Gauge
+  const mlPct   = Math.min(Math.max((signal.ml_pred + 0.02) / 0.04, 0), 1) * 100;
+  const mlHex   = signal.ml_pred > 0.002 ? '#00e87a' : signal.ml_pred < -0.002 ? '#ff3d5a' : '#f5c842';
   const mlLabel = signal.ml_pred > 0.002 ? 'ALCISTA' : signal.ml_pred < -0.002 ? 'BAJISTA' : 'NEUTRAL';
-  document.getElementById('ml-gauge-fill').style.width = mlPct + '%';
-  document.getElementById('ml-gauge-fill').style.background = mlColor;
-  document.getElementById('ml-gauge-label').textContent =
-    `${mlLabel} (${signal.ml_pred > 0 ? '+' : ''}${(signal.ml_pred * 100).toFixed(3)}%)`;
-  document.getElementById('ml-gauge-label').style.color = mlColor;
+  document.getElementById('ml-gauge-fill').style.cssText = `width:${mlPct}%;background:${mlHex}`;
+  const mlLabelEl = document.getElementById('ml-gauge-label');
+  mlLabelEl.textContent = `${mlLabel} (${signal.ml_pred > 0 ? '+' : ''}${(signal.ml_pred * 100).toFixed(3)}%)`;
+  mlLabelEl.style.color = mlHex;
 
   // Indicadores
   const rsiColor = signal.rsi < 35 ? '#00e87a' : signal.rsi > 65 ? '#ff3d5a' : '#aab';
-  document.getElementById('rsi-val').innerHTML = `<span style="color:${rsiColor}">${signal.rsi}</span>`;
+  document.getElementById('rsi-val').innerHTML =
+    `<span style="color:${rsiColor}">${signal.rsi}</span>`;
   document.getElementById('macd-val').innerHTML =
     `<span style="color:${signal.macd > 0 ? '#00e87a' : '#ff3d5a'}">${signal.macd > 0 ? '▲' : '▼'}</span>`;
 
-  // Re-render panels
-  renderHolding();
-  renderWaiting();
+  if (signal.bb && currentPrice) {
+    const p   = currentPrice;
+    const pos = p > signal.bb.upper ? 'SOBRE BANDA' : p < signal.bb.lower ? 'BAJO BANDA' : 'DENTRO';
+    const bc  = p > signal.bb.upper ? '#ff3d5a'     : p < signal.bb.lower ? '#00e87a'    : '#aab';
+    document.getElementById('bb-val').innerHTML = `<span style="color:${bc}">${pos}</span>`;
+  }
 }
 
-// ── Rendering de paneles ─────────────────────────────────────────────────
-function renderHolding() {
-  const myBuy = parseFloat(document.getElementById('buy-input').value) || null;
-  const el = document.getElementById('holding-result');
-  if (!myBuy || !signal) { el.innerHTML = ''; return; }
-  const p = signal.current_price;
-  const pnlPct = pct(myBuy, p);
-  const pnlAbs = p - myBuy;
-  const sigColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
-  const pnlColor = pnlAbs >= 0 ? '#00e87a' : '#ff3d5a';
+// ═══════════════════════════════════════════════════════════════════
+//  REGISTRAR OPERACIÓN (click en COMPRÉ / VENDÍ)
+// ═══════════════════════════════════════════════════════════════════
+function registrarOperacion(tipo) {
+  const val = parseFloat(document.getElementById('precio-input').value);
+  if (!val || val <= 0) {
+    document.getElementById('op-result').textContent = '⚠ Ingresa un precio válido primero.';
+    document.getElementById('op-result').className   = 'op-result';
+    return;
+  }
+  tipoOperacion = tipo;
+  precioUsuario = val;
 
-  el.innerHTML = `
-    <div class="metric" style="background:${pnlColor}0d;border:1px solid ${pnlColor}33">
-      <div class="metric-row">
+  document.getElementById('btn-compre').classList.toggle('active', tipo === 'compra');
+  document.getElementById('btn-vendi').classList.toggle('active', tipo === 'venta');
+
+  updateOpResult();
+  updateUserSignal();
+}
+
+// Se llama al editar el input mientras ya hay operación activa
+function onPrecioChange() {
+  if (!tipoOperacion) return;
+  const val = parseFloat(document.getElementById('precio-input').value);
+  if (val && val > 0) { precioUsuario = val; updateOpResult(); updateUserSignal(); }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  LÍNEA DINÁMICA DE RESULTADO — se actualiza en cada tick WS
+// ═══════════════════════════════════════════════════════════════════
+function updateOpResult() {
+  const el = document.getElementById('op-result');
+  if (!tipoOperacion || !precioUsuario || !currentPrice) {
+    el.textContent = '';
+    document.getElementById('op-detail').innerHTML = '';
+    return;
+  }
+
+  const p       = currentPrice;
+  const rawPct  = ((p - precioUsuario) / precioUsuario) * 100;
+  // Compra: ganas si sube. Venta: ganas si baja
+  const ganancia = tipoOperacion === 'compra' ? rawPct : -rawPct;
+  const label    = tipoOperacion === 'compra' ? 'COMPRÉ' : 'VENDÍ';
+  const sign     = ganancia >= 0 ? '+' : '';
+
+  el.textContent = `${label} a ${fmt(precioUsuario)}  —  (${sign}${ganancia.toFixed(2)}%)`;
+  el.className   = 'op-result ' + (ganancia >= 0 ? 'positive' : 'negative');
+
+  renderOpDetail(p, ganancia);
+}
+
+function renderOpDetail(p, ganancia) {
+  if (!signal) { document.getElementById('op-detail').innerHTML = ''; return; }
+  const isCompra = tipoOperacion === 'compra';
+
+  const targetPrice = isCompra ? signal.sell_target : signal.buy_target;
+  const targetHex   = isCompra ? '#00e87a' : '#f5c842';
+  const targetLabel = isCompra ? '🎯 VENDER CUANDO LLEGUE A' : '🎯 RECOMPRAR CUANDO LLEGUE A';
+  const targetPct   = isCompra
+    ? `+${pctStr(precioUsuario, signal.sell_target)}% desde tu entrada`
+    : `${pctStr(precioUsuario, signal.buy_target)}% vs tu venta`;
+
+  const tip = isCompra ? tipCompra(p, ganancia) : tipVenta(p, ganancia);
+
+  document.getElementById('op-detail').innerHTML = `
+    <div class="target-box" style="background:${targetHex}0d;border:1px solid ${targetHex}33">
+      <div class="target-label" style="color:${targetHex}">${targetLabel}</div>
+      <div class="target-row">
         <div>
-          <div class="metric-label">P&L ACTUAL</div>
-          <div class="metric-value" style="color:${pnlColor}">${pnlAbs>=0?'+':''}${pnlPct}%</div>
-          <div class="metric-sub">${pnlAbs>=0?'+':''}${fmt(pnlAbs)} por BTC</div>
-        </div>
-        <div class="metric-right">
-          <div class="lbl">COMPRASTE</div><div class="val" style="color:#99a">${fmt(myBuy)}</div>
-          <div class="lbl" style="margin-top:10px">AHORA</div><div class="val" style="color:#fff">${fmt(p)}</div>
-        </div>
-      </div>
-    </div>
-    <div class="target-box" style="background:#00e87a0d;border:1px solid #00e87a33">
-      <div class="target-label" style="color:#00e87a">🎯 VENDER CUANDO LLEGUE A</div>
-      <div class="metric-row">
-        <div>
-          <div class="target-price" style="color:#00e87a">${fmt(signal.sell_target)}</div>
-          <div class="target-pct">+${pct(myBuy, signal.sell_target)}% desde tu entrada</div>
+          <div class="target-price" style="color:${targetHex}">${fmt(targetPrice)}</div>
+          <div class="target-pct">${targetPct}</div>
         </div>
         <div class="target-bb">
           <div>BB sup: ${fmt(signal.bb.upper)}</div>
           <div>BB med: ${fmt(signal.bb.middle)}</div>
-        </div>
-      </div>
-      <div class="target-tip">
-        ${signal.action==='VENDER' ? '⚠️ ML + técnico indican VENTA. Considera cerrar posición.'
-          : signal.action==='COMPRAR' ? '✅ ML + técnico alcistas. Mantén hasta el objetivo.'
-          : '📊 Señales mixtas. Mantén y espera confirmación.'}
-      </div>
-    </div>`;
-}
-
-function renderWaiting() {
-  const mySell = parseFloat(document.getElementById('sell-input').value) || null;
-  const el = document.getElementById('waiting-result');
-  if (!mySell || !signal) { el.innerHTML = ''; return; }
-  const p = signal.current_price;
-  const potPct = pct(mySell, p);
-  const diff = p - mySell;
-  const downColor = p < mySell ? '#00e87a' : '#ff3d5a';
-  const dotColor = signal.action === 'COMPRAR' ? '#00e87a' : signal.action === 'VENDER' ? '#ff3d5a' : '#f5c842';
-
-  el.innerHTML = `
-    <div class="metric" style="background:${downColor}0d;border:1px solid ${downColor}33">
-      <div class="metric-row">
-        <div>
-          <div class="metric-label">VS TU VENTA</div>
-          <div class="metric-value" style="color:${downColor}">${potPct}%</div>
-          <div class="metric-sub">${p < mySell ? 'BTC bajó ' + fmt(Math.abs(diff)) + ' ✅' : 'BTC subió ' + fmt(diff) + ' ⚠️'}</div>
-        </div>
-        <div class="metric-right">
-          <div class="lbl">VENDISTE A</div><div class="val" style="color:#99a">${fmt(mySell)}</div>
-          <div class="lbl" style="margin-top:10px">AHORA</div><div class="val" style="color:#fff">${fmt(p)}</div>
-        </div>
-      </div>
-    </div>
-    <div class="target-box" style="background:#f5c8420d;border:1px solid #f5c84233">
-      <div class="target-label" style="color:#f5c842">🎯 COMPRAR CUANDO LLEGUE A</div>
-      <div class="metric-row">
-        <div>
-          <div class="target-price" style="color:#f5c842">${fmt(signal.buy_target)}</div>
-          <div class="target-pct">${pct(mySell, signal.buy_target)}% vs tu venta</div>
-        </div>
-        <div class="target-bb">
           <div>BB inf: ${fmt(signal.bb.lower)}</div>
-          <div>BB med: ${fmt(signal.bb.middle)}</div>
         </div>
       </div>
-      <div class="target-tip">
-        ${signal.action==='COMPRAR' ? '✅ ML + técnico confirman compra. Buen momento para entrar.'
-          : signal.action==='VENDER' ? '⏳ ML predice más caída. Espera al precio objetivo.'
-          : '📊 Señales neutrales. Entra con una posición pequeña.'}
-      </div>
-    </div>
-    <div class="semaforo">
-      <div class="semaforo-dot" style="background:${dotColor};box-shadow:0 0 10px ${dotColor}"></div>
-      <div class="semaforo-text">
-        <strong style="color:#aab">¿Comprar ahora?</strong>
-        ${signal.action==='COMPRAR' ? ' Sí — ML y técnicos confirman entrada.'
-          : signal.action==='VENDER' ? ' No — el modelo predice más caída.'
-          : ' Con cautela — espera señal más clara.'}
-      </div>
+      <div class="target-tip">${tip}</div>
     </div>`;
 }
 
-// ── Análisis IA ───────────────────────────────────────────────────────────
-async function askAI() {
+// ═══════════════════════════════════════════════════════════════════
+//  SEÑAL ENRIQUECIDA — combina ML + técnico + posición usuario
+// ═══════════════════════════════════════════════════════════════════
+function updateUserSignal() {
+  if (!signal || !tipoOperacion || !precioUsuario || !currentPrice) {
+    renderSignalBase();
+    return;
+  }
+
+  const p        = currentPrice;
+  const rawPct   = ((p - precioUsuario) / precioUsuario) * 100;
+  const ganancia = tipoOperacion === 'compra' ? rawPct : -rawPct;
+  const rsi      = signal.rsi;
+  const mlBull   = signal.ml_pred > 0.002;
+  const mlBear   = signal.ml_pred < -0.002;
+  const g        = ganancia.toFixed(2);
+  const sign     = ganancia >= 0 ? '+' : '';
+
+  let accion, hex;
+
+  if (tipoOperacion === 'compra') {
+    if (rsi > 75 || p > precioUsuario * 1.15) {
+      accion = `▼ VENDER (SOBRECOMPRA)`;              hex = '#ff3d5a';
+    } else if (p < precioUsuario * 0.92 && !mlBull) {
+      accion = `⚠ STOP LOSS (${sign}${g}%)`;           hex = '#ff3d5a';
+    } else if (p > precioUsuario && (mlBull || signal.action === 'COMPRAR')) {
+      accion = `◆ MANTENER (GANANCIA ${sign}${g}%)`;   hex = '#00e87a';
+    } else if (p < precioUsuario && mlBear) {
+      accion = `⚠ PRECAUCIÓN (${sign}${g}%)`;          hex = '#f5c842';
+    } else {
+      accion = `◆ MANTENER (${sign}${g}%)`;             hex = '#f5c842';
+    }
+  } else {
+    if (p < precioUsuario && rsi < 30) {
+      accion = `▲ REENTRADA ÓPTIMA`;                   hex = '#00e87a';
+    } else if (p < precioUsuario && mlBull) {
+      accion = `▲ REENTRADA POSIBLE`;                  hex = '#00e87a';
+    } else if (p < precioUsuario) {
+      accion = `✅ BIEN VENDIDO (${sign}${g}%)`;        hex = '#00e87a';
+    } else if (p > precioUsuario * 1.05 && mlBull) {
+      accion = `⚠ REENTRADA URGENTE`;                  hex = '#f5c842';
+    } else {
+      accion = `⏳ ESPERAR CORRECCIÓN`;                 hex = '#f5c842';
+    }
+  }
+
+  setCardStyle(hex);
+  setAction(accion, hex, hex);
+  document.getElementById('conf-bar').style.background = hex;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  TEXTOS TIP
+// ═══════════════════════════════════════════════════════════════════
+function tipCompra(p, ganancia) {
+  const rsi = signal.rsi;
+  if (rsi > 70)
+    return `⚠️ RSI en sobrecompra (${rsi.toFixed(0)}). El rally puede estar agotándose. Considera venta parcial.`;
+  if (p > precioUsuario && signal.action === 'COMPRAR')
+    return `✅ ML + técnicos alcistas. Mantén hasta el objetivo. Stop loss sugerido: ${fmt(precioUsuario * 0.94)}.`;
+  if (p < precioUsuario && signal.action === 'VENDER')
+    return `⚠️ Precio por debajo de tu entrada y ML bajista. Evalúa salida para limitar pérdidas.`;
+  return `📊 Señales mixtas. RSI ${rsi.toFixed(0)}, mercado sin dirección clara. Mantén con stop en ${fmt(precioUsuario * 0.94)}.`;
+}
+
+function tipVenta(p, ganancia) {
+  const rsi = signal.rsi;
+  if (rsi < 30)
+    return `✅ RSI en sobreventa (${rsi.toFixed(0)}). Zona de posible rebote. Buen punto de recompra.`;
+  if (p < precioUsuario && signal.action === 'COMPRAR')
+    return `✅ Vendiste bien y ML señala rebote. Considera reentrar cerca del target.`;
+  if (p > precioUsuario)
+    return `⚠️ BTC subió desde tu venta. Si ML sigue alcista, el costo de no reentrar crece.`;
+  return `📊 RSI ${rsi.toFixed(0)}, sin señal clara aún. Espera que el precio llegue al target antes de recomprar.`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  ANÁLISIS IA — POST /api/analyze
+// ═══════════════════════════════════════════════════════════════════
+async function analizarConIA() {
   if (!signal) return;
   const btn = document.getElementById('ai-btn');
   const out = document.getElementById('ai-output');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = '◈ ANALIZANDO···';
-  out.className = 'ai-placeholder';
+  out.className   = 'ai-placeholder';
   out.textContent = 'Generando análisis…';
 
-  const body = {
-    signal,
-    mode,
-    myBuy: parseFloat(document.getElementById('buy-input').value) || null,
-    mySell: parseFloat(document.getElementById('sell-input').value) || null,
-  };
+  const p        = currentPrice || signal.current_price;
+  const rawPct   = precioUsuario ? ((p - precioUsuario) / precioUsuario * 100) : null;
+  const ganancia = rawPct !== null ? (tipoOperacion === 'compra' ? rawPct : -rawPct) : null;
 
   try {
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const res  = await fetch('/api/analyze', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        signal: { ...signal, current_price: p },
+        tipoOperacion,
+        precioUsuario,
+        ganancia: ganancia !== null ? ganancia.toFixed(2) : null,
+      }),
     });
     const data = await res.json();
-    out.className = 'ai-text';
+    out.className   = 'ai-output';
     out.textContent = data.analysis ?? 'Sin respuesta.';
   } catch {
-    out.textContent = 'Error de conexión.';
+    out.className   = 'ai-output';
+    out.textContent = 'Error de conexión con el servidor.';
   }
-  btn.disabled = false;
+  btn.disabled    = false;
   btn.textContent = '◈ ANALIZAR CON IA';
 }
 
-// ── Tabs ──────────────────────────────────────────────────────────────────
-function setMode(m) {
-  mode = m;
-  document.getElementById('panel-holding').style.display = m === 'holding' ? 'block' : 'none';
-  document.getElementById('panel-waiting').style.display = m === 'waiting' ? 'block' : 'none';
-  document.getElementById('tab-holding').className = 'tab-btn' + (m === 'holding' ? ' active' : '');
-  document.getElementById('tab-waiting').className = 'tab-btn' + (m === 'waiting' ? ' active' : '');
-  document.getElementById('ai-output').textContent = 'Ingresa tu precio y presiona el botón para análisis personalizado.';
-  document.getElementById('ai-output').className = 'ai-placeholder';
-}
-
-// ── Sparkline SVG ─────────────────────────────────────────────────────────
-function drawSparkline(prices, color) {
+// ═══════════════════════════════════════════════════════════════════
+//  SPARKLINE
+// ═══════════════════════════════════════════════════════════════════
+function drawSparkline(prices, hexColor) {
   if (prices.length < 2) return;
   const W = 110, H = 34;
-  const mn = Math.min(...prices), mx = Math.max(...prices), r = mx - mn || 1;
-  const pts = prices.map((p, i) =>
-    `${(i/(prices.length-1))*W},${H-((p-mn)/r)*(H-3)+1}`
+  const step   = Math.max(1, Math.floor(prices.length / 50));
+  const sample = prices.filter((_, i) => i % step === 0);
+  const mn = Math.min(...sample), mx = Math.max(...sample), r = mx - mn || 1;
+  const pts = sample.map((p, i) =>
+    `${(i / (sample.length - 1)) * W},${H - ((p - mn) / r) * (H - 3) + 1}`
   ).join(' ');
   document.getElementById('sparkline').innerHTML = `
     <defs>
       <linearGradient id="slg" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-        <stop offset="100%" stop-color="${color}" stop-opacity="1"/>
+        <stop offset="0%" stop-color="${hexColor}" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="${hexColor}" stop-opacity="1"/>
       </linearGradient>
     </defs>
     <polyline points="${pts}" fill="none" stroke="url(#slg)" stroke-width="1.8" stroke-linejoin="round"/>`;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-function fmt(n, d=0) {
-  if (n == null || isNaN(n)) return '—';
-  return '$' + Number(n).toLocaleString('es-MX', {minimumFractionDigits:d, maximumFractionDigits:d});
+// ═══════════════════════════════════════════════════════════════════
+//  HELPERS UI
+// ═══════════════════════════════════════════════════════════════════
+function setCardStyle(hex) {
+  const card = document.getElementById('signal-card');
+  card.style.border    = `1px solid ${hex}44`;
+  card.style.boxShadow = `0 0 20px ${hex}15`;
 }
-function pct(a, b) {
+function setAction(text, cssColor, hex) {
+  const el = document.getElementById('action-display');
+  el.textContent    = text;
+  el.style.color    = cssColor;
+  el.style.textShadow = `0 0 14px ${hex}55`;
+}
+function sigHex(action) {
+  return action === 'COMPRAR' ? '#00e87a' : action === 'VENDER' ? '#ff3d5a' : '#f5c842';
+}
+function sigCss(action) {
+  return action === 'COMPRAR' ? 'var(--green)' : action === 'VENDER' ? 'var(--red)' : 'var(--yellow)';
+}
+function fmt(n, d = 0) {
+  if (n == null || isNaN(n)) return '—';
+  return '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function pctStr(a, b) {
   if (!a || !b) return '0.00';
-  return ((b-a)/a*100).toFixed(2);
+  return ((b - a) / a * 100).toFixed(2);
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════════
+connectWS();
 fetchSignal();
 setInterval(fetchSignal, 60000);
 </script>

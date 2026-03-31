@@ -54,23 +54,25 @@ app.get("/api/signal", (req, res) => {
 
 // ── /api/analyze ── Análisis IA personalizado vía Claude API
 app.post("/api/analyze", async (req, res) => {
-  const { signal, myBuy, mySell, mode } = req.body;
+  const { signal, tipoOperacion, precioUsuario, ganancia } = req.body;
 
   if (!signal) return res.status(400).json({ error: "missing_signal" });
 
-  const ctx =
-    mode === "holding" && myBuy
-      ? `El usuario compró BTC a $${myBuy}. Precio actual: $${signal.current_price}. Target venta: $${signal.sell_target}.`
-      : mode === "waiting" && mySell
-      ? `El usuario vendió BTC a $${mySell}. Precio actual: $${signal.current_price}. Target recompra: $${signal.buy_target}.`
-      : `Precio actual BTC: $${signal.current_price}.`;
+  let ctxUsuario = "El usuario no ha registrado operación.";
+  if (tipoOperacion === "compra" && precioUsuario) {
+    ctxUsuario = `El usuario COMPRÓ BTC a $${precioUsuario}. Precio actual: $${signal.current_price}. Resultado: ${ganancia >= 0 ? "+" : ""}${ganancia}%. Target de venta: $${signal.sell_target}.`;
+  } else if (tipoOperacion === "venta" && precioUsuario) {
+    ctxUsuario = `El usuario VENDIÓ BTC a $${precioUsuario}. Precio actual: $${signal.current_price}. Resultado: ${ganancia >= 0 ? "+" : ""}${ganancia}% (positivo = bajó desde su venta). Target de recompra: $${signal.buy_target}.`;
+  }
 
-  const prompt = `Eres un trader experto en Bitcoin. Responde en español, 3 oraciones directas, sin asteriscos ni markdown.
+  const prompt = `Eres un trader experto en Bitcoin. Responde en español, 3-4 oraciones directas, sin asteriscos ni markdown.
 
-Contexto: ${ctx}
-RSI: ${signal.rsi}, MACD: ${signal.macd > 0 ? "positivo" : "negativo"}, Predicción ML: ${signal.ml_pred > 0 ? "+" : ""}${(signal.ml_pred * 100).toFixed(3)}%, Señal: ${signal.action} con ${signal.confidence}% confianza.
+Contexto del usuario: ${ctxUsuario}
+RSI: ${signal.rsi} | MACD: ${signal.macd > 0 ? "positivo" : "negativo"} | ML: ${signal.ml_pred > 0 ? "+" : ""}${(signal.ml_pred * 100).toFixed(3)}%
+Señal: ${signal.action} con ${signal.confidence}% de confianza.
+BB: sup $${signal.bb?.upper?.toFixed(0)}, med $${signal.bb?.middle?.toFixed(0)}, inf $${signal.bb?.lower?.toFixed(0)}.
 
-1) Estado actual del mercado. 2) Qué debe hacer el usuario AHORA. 3) Precio clave a vigilar.`;
+Responde: 1) Estado del mercado. 2) Qué debe hacer el usuario AHORA con su posición. 3) Precio clave a vigilar.`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
