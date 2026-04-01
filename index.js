@@ -1,25 +1,80 @@
-import express    from "express";
-import { spawn }  from "child_process";
-import path       from "path";
+import express       from "express";
+import { spawn }     from "child_process";
+import path          from "path";
 import { fileURLToPath } from "url";
-import bcrypt     from "bcryptjs";
-import db         from "./db.js";
+import bcrypt        from "bcryptjs";
+import rateLimit     from "express-rate-limit";
+import helmet        from "helmet";
+import db            from "./db.js";
 import { signToken, requireAuth, requireAdmin } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
 const PORT = process.env.PORT || 3000;
+const PROD_ORIGIN = process.env.FRONTEND_ORIGIN || "*";
 
-app.use(express.json());
+// ═══════════════════════════════════════════════════════════════════
+//  SEGURIDAD GLOBAL
+// ═══════════════════════════════════════════════════════════════════
+
+// Helmet — headers de seguridad (CSP, HSTS, etc.)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "unpkg.com", "cdnjs.cloudflare.com", "'unsafe-inline'"],
+      connectSrc: ["'self'", "api.binance.com", "stream.binance.com", "api.anthropic.com"],
+      styleSrc:   ["'self'", "'unsafe-inline'"],
+      imgSrc:     ["'self'", "data:"],
+    },
+  },
+}));
+
+// CORS manual — solo permite el origen de producción (o * en dev)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (PROD_ORIGIN === "*" || origin === PROD_ORIGIN) {
+    res.setHeader("Access-Control-Allow-Origin",  PROD_ORIGIN);
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  }
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+// Rate limiter global — 100 req / 15 min por IP
+const globalLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { error: "Demasiadas solicitudes, intenta en unos minutos" },
+});
+app.use("/api/", globalLimit);
+
+// Rate limiter estricto para login — 10 intentos / 15 min
+const loginLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: "Demasiados intentos de login" },
+});
+
+app.use(express.json({ limit: "20kb" }));   // evita body bomb
 app.use(express.static(path.join(__dirname, "public")));
+
+// ── Sanitizador básico de strings (strip < > & " ')
+function sanitize(str) {
+  if (typeof str !== "string") return str;
+  return str.replace(/[<>"'&]/g, "").trim().slice(0, 120);
+}
 
 // ═══════════════════════════════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════════════════════════════
 
-// POST /api/login
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
+app.post("/api/login", loginLimit, (req, res) => {
+  const username = sanitize(req.body?.username || "");
+  const password = String(req.body?.password  || "").slice(0, 128);
   if (!username || !password)
     return res.status(400).json({ error: "Faltan credenciales" });
 
@@ -31,7 +86,6 @@ app.post("/api/login", (req, res) => {
   res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
 });
 
-// GET /api/me
 app.get("/api/me", requireAuth, (req, res) => {
   const user = db.prepare("SELECT id, username, role, created_at FROM users WHERE id = ?")
     .get(req.user.id);
@@ -42,28 +96,29 @@ app.get("/api/me", requireAuth, (req, res) => {
 //  OPERACIONES
 // ═══════════════════════════════════════════════════════════════════
 
-// POST /api/operacion  { tipo, precio }
 app.post("/api/operacion", requireAuth, (req, res) => {
-  const { tipo, precio } = req.body;
-  if (!["compra","venta"].includes(tipo) || !precio || isNaN(precio))
-    return res.status(400).json({ error: "Datos inválidos" });
+  const tipo   = sanitize(req.body?.tipo || "");
+  const precio = parseFloat(req.body?.precio);
+
+  if (!["compra","venta"].includes(tipo))
+    return res.status(400).json({ error: "Tipo inválido" });
+  if (!precio || isNaN(precio) || precio <= 0 || precio > 10_000_000)
+    return res.status(400).json({ error: "Precio inválido" });
 
   const result = db.prepare(
     "INSERT INTO operaciones (user_id, tipo, precio) VALUES (?, ?, ?)"
-  ).run(req.user.id, tipo, parseFloat(precio));
+  ).run(req.user.id, tipo, precio);
 
   const op = db.prepare("SELECT * FROM operaciones WHERE id = ?").get(result.lastInsertRowid);
   res.json(op);
 });
 
-// GET /api/operaciones  — historial del usuario (o todos si es admin con ?all=1)
 app.get("/api/operaciones", requireAuth, (req, res) => {
   let rows;
   if (req.user.role === "admin" && req.query.all === "1") {
     rows = db.prepare(`
       SELECT o.*, u.username FROM operaciones o
-      JOIN users u ON u.id = o.user_id
-      ORDER BY o.fecha DESC
+      JOIN users u ON u.id = o.user_id ORDER BY o.fecha DESC
     `).all();
   } else {
     rows = db.prepare(
@@ -73,14 +128,13 @@ app.get("/api/operaciones", requireAuth, (req, res) => {
   res.json(rows);
 });
 
-// DELETE /api/operaciones  — reset historial del usuario actual
 app.delete("/api/operaciones", requireAuth, (req, res) => {
   db.prepare("DELETE FROM operaciones WHERE user_id = ?").run(req.user.id);
   res.json({ ok: true });
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  SEÑAL ML (corre model_runner.py, con caché 60s)
+//  SEÑAL ML
 // ═══════════════════════════════════════════════════════════════════
 let mlCache = { data: null, ts: 0 };
 
@@ -94,52 +148,57 @@ app.get("/api/signal", requireAuth, (req, res) => {
   py.stdout.on("data", d => out += d);
   py.stderr.on("data", d => err += d);
   py.on("close", code => {
-    if (code !== 0) return res.status(500).json({ error: "model_error", detail: err });
+    if (code !== 0)
+      return res.status(500).json({ error: "No se pudo calcular la señal. Intenta de nuevo." });
     try {
       const result = JSON.parse(out.trim());
-      if (result.error) return res.status(500).json(result);
+      if (result.error) return res.status(500).json({ error: "Error en el modelo ML" });
       mlCache = { data: result, ts: now };
       res.json(result);
-    } catch { res.status(500).json({ error: "parse_error", raw: out }); }
+    } catch {
+      res.status(500).json({ error: "Error procesando resultado ML" });
+    }
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  ANÁLISIS IA PERSONALIZADO
+//  ANÁLISIS IA
 // ═══════════════════════════════════════════════════════════════════
 app.post("/api/analyze", requireAuth, async (req, res) => {
-  const { signal, tipoOperacion, precioUsuario, ganancia,
-          historialResumen, tendencia24h, precioEstimado } = req.body;
-  if (!signal) return res.status(400).json({ error: "missing_signal" });
+  const sig            = req.body?.signal;
+  const tipoOperacion  = sanitize(req.body?.tipoOperacion || "");
+  const precioUsuario  = parseFloat(req.body?.precioUsuario) || null;
+  const ganancia       = parseFloat(req.body?.ganancia)      || null;
+  const histResumen    = sanitize(req.body?.historialResumen || "");
+
+  if (!sig) return res.status(400).json({ error: "Datos insuficientes" });
 
   let ctxOp = "Sin operación registrada.";
-  if (tipoOperacion === "compra" && precioUsuario) {
-    ctxOp = `COMPRÓ a $${precioUsuario}. Resultado actual: ${ganancia}%. `
-      + (tendencia24h ? `Tendencia 24h: ${tendencia24h}. Precio estimado 24h: $${precioEstimado}.` : "");
-  } else if (tipoOperacion === "venta" && precioUsuario) {
-    ctxOp = `VENDIÓ a $${precioUsuario}. Resultado: ${ganancia}%. `
-      + (tendencia24h ? `Tendencia 24h: ${tendencia24h}. Precio estimado 24h: $${precioEstimado}.` : "");
+  if (["compra","venta"].includes(tipoOperacion) && precioUsuario) {
+    const label = tipoOperacion === "compra" ? "COMPRÓ" : "VENDIÓ";
+    ctxOp = `${label} a $${precioUsuario}. Resultado actual: ${ganancia !== null ? ganancia + "%" : "N/A"}. `;
   }
 
-  const prompt = `Eres un trader experto en Bitcoin. Responde en español, directo, sin markdown.
+  const safePrice = parseFloat(sig.current_price) || 0;
+  const safeRsi   = parseFloat(sig.rsi)   || 0;
+  const safeMacd  = parseFloat(sig.macd)  || 0;
+  const safeMlPred= parseFloat(sig.ml_pred) || 0;
 
-MERCADO ACTUAL:
-- Precio: $${signal.current_price}
-- RSI: ${signal.rsi} | MACD: ${signal.macd > 0 ? "positivo" : "negativo"}
-- ML predicción: ${signal.ml_pred > 0 ? "+" : ""}${(signal.ml_pred * 100).toFixed(3)}%
-- Señal: ${signal.action} (${signal.confidence}% confianza)
-- BB: sup $${signal.bb?.upper?.toFixed(0)}, med $${signal.bb?.middle?.toFixed(0)}, inf $${signal.bb?.lower?.toFixed(0)}
+  const prompt = `Eres un trader experto en Bitcoin. Responde en español, directo, sin markdown ni asteriscos.
 
-OPERACIÓN USUARIO: ${ctxOp}
-HISTORIAL RESUMEN: ${historialResumen || "Sin historial previo."}
+MERCADO: Precio $${safePrice} | RSI ${safeRsi} | MACD ${safeMacd > 0 ? "positivo" : "negativo"} | ML ${safeMlPred > 0 ? "+" : ""}${(safeMlPred * 100).toFixed(3)}% | Señal: ${sig.action} (${sig.confidence}% confianza)
+BB: sup $${sig.bb?.upper?.toFixed(0) ?? "?"}, med $${sig.bb?.middle?.toFixed(0) ?? "?"}, inf $${sig.bb?.lower?.toFixed(0) ?? "?"}
 
-RESPONDE EN ESTE FORMATO EXACTO (sin asteriscos):
+USUARIO: ${ctxOp}
+HISTORIAL: ${histResumen || "Sin historial."}
+
+FORMATO DE RESPUESTA (exacto, sin cambios):
 Tendencia 24h: [Alcista/Bajista/Lateral]
 Precio estimado: $[número]
 Objetivo recomendado: +[1-5]% (zona segura)
 Acción: [HOLD / VENDER / COMPRAR / RECOMPRAR]
-Sugerencia: [una oración concreta con precio específico]
-Análisis: [2-3 oraciones explicando el razonamiento]`;
+Sugerencia: [una oración con precio específico]
+Análisis: [2-3 oraciones de razonamiento]`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -158,15 +217,15 @@ Análisis: [2-3 oraciones explicando el razonamiento]`;
     const d    = await r.json();
     const text = d.content?.filter(b => b.type === "text").map(b => b.text).join("") ?? "";
     res.json({ analysis: text });
-  } catch (e) {
-    res.status(500).json({ error: "ai_error", detail: e.message });
+  } catch {
+    res.status(500).json({ error: "No se pudo conectar con la IA. Intenta más tarde." });
   }
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  MARKET — altcoins + alertas
+//  MERCADO
 // ═══════════════════════════════════════════════════════════════════
-const COINS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"];
+const COIN_SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT"];
 let marketCache = { data: null, ts: 0 };
 
 app.get("/api/market", requireAuth, async (req, res) => {
@@ -175,102 +234,106 @@ app.get("/api/market", requireAuth, async (req, res) => {
     return res.json(marketCache.data);
 
   try {
-    const symbols = encodeURIComponent(JSON.stringify(COINS));
-    const r = await fetch(
-      `https://api.binance.com/api/v3/ticker/24hr?symbols=${symbols}`
+    // Fetch individual para evitar el problema de formato del parámetro symbols
+    const results = await Promise.all(
+      COIN_SYMBOLS.map(s =>
+        fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${s}`)
+          .then(r => r.json())
+          .catch(() => null)
+      )
     );
-    const tickers = await r.json();
 
-    const coins = tickers.map(t => ({
-      symbol:    t.symbol.replace("USDT",""),
-      price:     parseFloat(t.lastPrice),
-      change24h: parseFloat(t.priceChangePercent),
-      volume:    parseFloat(t.quoteVolume),
-    })).sort((a, b) => b.change24h - a.change24h);
+    const coins = results
+      .filter(t => t && t.symbol)
+      .map(t => ({
+        symbol:    t.symbol.replace("USDT", ""),
+        price:     parseFloat(t.lastPrice),
+        change24h: parseFloat(t.priceChangePercent),
+        volume:    parseFloat(t.quoteVolume),
+        high:      parseFloat(t.highPrice),
+        low:       parseFloat(t.lowPrice),
+      }))
+      .sort((a, b) => b.change24h - a.change24h);
 
-    // Alertas básicas por breakout/soporte
     const alerts = [];
     for (const c of coins) {
       if (c.change24h > 5)
-        alerts.push({ type:"breakout", coin: c.symbol,
-          msg: `🔺 ${c.symbol} rompe resistencia — +${c.change24h.toFixed(1)}% en 24h`, color:"green" });
+        alerts.push({ msg: `🔺 ${c.symbol} +${c.change24h.toFixed(1)}% — breakout alcista`, color: "green" });
       else if (c.change24h < -5)
-        alerts.push({ type:"support", coin: c.symbol,
-          msg: `🔻 ${c.symbol} perdiendo soporte — ${c.change24h.toFixed(1)}% en 24h`, color:"red" });
+        alerts.push({ msg: `🔻 ${c.symbol} ${c.change24h.toFixed(1)}% — perdiendo soporte`, color: "red" });
     }
 
-    // Arbitraje simple: comparar BTC vs resto
     const btc  = coins.find(c => c.symbol === "BTC");
     const alts = coins.filter(c => c.symbol !== "BTC" && c.change24h > (btc?.change24h ?? 0) + 2);
     const arb  = alts.length
-      ? { recommendation: `Rotar parte del capital BTC → ${alts[0].symbol}`,
-          reason: `${alts[0].symbol} supera a BTC en ${(alts[0].change24h - btc.change24h).toFixed(1)}% hoy` }
+      ? {
+          recommendation: `Rotación sugerida: BTC → ${alts[0].symbol}`,
+          reason: `${alts[0].symbol} supera a BTC en ${(alts[0].change24h - (btc?.change24h ?? 0)).toFixed(1)}% hoy`,
+        }
       : null;
 
     const result = { coins, alerts, arbitrage: arb };
     marketCache  = { data: result, ts: now };
     res.json(result);
-  } catch (e) {
-    res.status(500).json({ error: "market_error", detail: e.message });
+  } catch {
+    res.status(500).json({ error: "Error cargando datos del mercado. Intenta de nuevo." });
   }
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  ADMIN — gestión de usuarios
+//  ADMIN
 // ═══════════════════════════════════════════════════════════════════
 
-// GET /api/admin/users
 app.get("/api/admin/users", requireAuth, requireAdmin, (req, res) => {
-  const users = db.prepare(
-    "SELECT id, username, role, created_at FROM users ORDER BY id"
-  ).all();
+  const users = db.prepare("SELECT id, username, role, created_at FROM users ORDER BY id").all();
   res.json(users);
 });
 
-// POST /api/admin/users  { username, password, role }
 app.post("/api/admin/users", requireAuth, requireAdmin, (req, res) => {
-  const { username, password, role = "user" } = req.body;
+  const username = sanitize(req.body?.username || "");
+  const password = String(req.body?.password || "").slice(0, 128);
+  const role     = ["user","admin"].includes(req.body?.role) ? req.body.role : "user";
   if (!username || !password)
     return res.status(400).json({ error: "Faltan datos" });
   try {
     const hash = bcrypt.hashSync(password, 10);
-    const r    = db.prepare(
-      "INSERT INTO users (username, password, role) VALUES (?, ?, ?)"
-    ).run(username, hash, role);
+    const r    = db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run(username, hash, role);
     res.json({ id: r.lastInsertRowid, username, role });
-  } catch (e) {
+  } catch {
     res.status(409).json({ error: "El usuario ya existe" });
   }
 });
 
-// DELETE /api/admin/users/:id
 app.delete("/api/admin/users/:id", requireAuth, requireAdmin, (req, res) => {
   const id = parseInt(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "ID inválido" });
   if (id === req.user.id) return res.status(400).json({ error: "No puedes eliminarte a ti mismo" });
   db.prepare("DELETE FROM users WHERE id = ?").run(id);
   res.json({ ok: true });
 });
 
-// PATCH /api/admin/users/:id/password  { password }
 app.patch("/api/admin/users/:id/password", requireAuth, requireAdmin, (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ error: "Falta la contraseña" });
+  const id       = parseInt(req.params.id);
+  const password = String(req.body?.password || "").slice(0, 128);
+  if (!Number.isInteger(id) || !password)
+    return res.status(400).json({ error: "Datos inválidos" });
   const hash = bcrypt.hashSync(password, 10);
-  db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hash, parseInt(req.params.id));
+  db.prepare("UPDATE users SET password = ? WHERE id = ?").run(hash, id);
   res.json({ ok: true });
 });
 
-// DELETE /api/admin/users/:id/operaciones  — resetear historial de un usuario
 app.delete("/api/admin/users/:id/operaciones", requireAuth, requireAdmin, (req, res) => {
-  db.prepare("DELETE FROM operaciones WHERE user_id = ?").run(parseInt(req.params.id));
+  const id = parseInt(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: "ID inválido" });
+  db.prepare("DELETE FROM operaciones WHERE user_id = ?").run(id);
   res.json({ ok: true });
 });
 
-// Fallback SPA
+// SPA fallback
 app.get("*", (_, res) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
 
 app.listen(PORT, () =>
-  console.log(`✅ cripto-ai v3 → http://localhost:${PORT}`)
+  console.log(`✅ BTC Oracle v4 → http://localhost:${PORT}`)
 );

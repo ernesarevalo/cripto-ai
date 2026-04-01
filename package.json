@@ -1,7 +1,7 @@
 {
   "name": "cripto-ai",
-  "version": "3.0.0",
-  "description": "Crypto trading AI with ML predictions, multi-user, SQLite persistence",
+  "version": "4.0.0",
+  "description": "BTC Oracle — Binance Lite style trading platform",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "better-sqlite3": "^9.4.3",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
     "node-fetch": "^3.3.2"
   }
 }
