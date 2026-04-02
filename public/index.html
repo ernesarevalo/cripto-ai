@@ -275,7 +275,6 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
         <div id="iaout" class="iaph">Registra tu operación y presiona Analizar.</div>
         <div class="iaact">
           <button class="iabtn" id="iabtn">✦ Analizar con IA</button>
-          <button class="rbtn" id="rbtn1">↺ Reset historial</button>
         </div>
       </div>
 
@@ -285,6 +284,10 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
           <button class="tfbtn active" data-tf="1m">1m</button>
           <button class="tfbtn" data-tf="5m">5m</button>
           <button class="tfbtn" data-tf="15m">15m</button>
+          <button class="tfbtn" data-tf="1h">1h</button>
+          <button class="tfbtn" data-tf="4h">4h</button>
+          <button class="tfbtn" data-tf="1d">1D</button>
+          <button class="tfbtn" data-tf="1w">1W</button>
         </div>
         <div id="chcont"><div class="chldr" id="chldr">Cargando gráfico…</div></div>
       </div>
@@ -329,11 +332,11 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 
 <script>
 'use strict';
-// ─── STATE ────────────────────────────────────────────────
+// ─── STATE ────────────────────────────────────────────────────────────────
 let TOKEN=localStorage.getItem('bt4')||null,ME=JSON.parse(localStorage.getItem('bt4u')||'null');
-let signal=null,lp=null,pp=null,spk=[],opT=null,opP=null,hist=[],chart=null,cand=null,curTF='1m',ws=null,wst=null;
+let signal=null,lp=null,pp=null,spk=[],opT=null,opP=null,hist=[],chart=null,cand=null,curTF='1m',ws=null,wst=null,wsPollFallback=false;
 
-// ─── API HELPER ───────────────────────────────────────────
+// ─── API HELPER ──────────────────────────────────────────────────────────
 async function api(url,{method='GET',body=null,auth=true}={}){
   const h={'Content-Type':'application/json'};
   if(auth&&TOKEN)h['Authorization']='Bearer '+TOKEN;
@@ -343,7 +346,7 @@ async function api(url,{method='GET',body=null,auth=true}={}){
   return data;
 }
 
-// ─── AUTH ─────────────────────────────────────────────────
+// ─── AUTH ────────────────────────────────────────────────────────────────
 async function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value,e=document.getElementById('le');
   e.textContent='';
@@ -359,7 +362,7 @@ function doLogout(){
   TOKEN=null;ME=null;localStorage.removeItem('bt4');localStorage.removeItem('bt4u');location.reload();
 }
 
-// ─── START APP ────────────────────────────────────────────
+// ─── START APP ──────────────────────────────────────────────────────────
 async function startApp(){
   if(!TOKEN||!ME)return;
   document.getElementById('ls').style.display='none';
@@ -368,8 +371,7 @@ async function startApp(){
   if(ME.role==='admin'){
     document.getElementById('nvr').style.display='inline';
     document.getElementById('nvr').textContent='ADMIN';
-    const adminTab=document.getElementById('tn-admin');
-    if(adminTab)adminTab.style.display='';
+    const at=document.getElementById('tn-admin');if(at)at.style.display='';
   }
   await loadHist();
   connectWS();
@@ -379,43 +381,85 @@ async function startApp(){
   if(ME.role==='admin')loadAdmin();
 }
 
-// ─── WEBSOCKET ────────────────────────────────────────────
+// ─── WEBSOCKET (con fallback a polling si CSP bloquea) ──────────────────
 function connectWS(){
-  try{
-    ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-    ws.onopen=()=>{
-      const m=document.getElementById('pmeta');
-      if(m)m.innerHTML='<span class="ldot"></span>LIVE · Binance';
-      if(wst){clearTimeout(wst);wst=null;}
-    };
-    ws.onmessage=e=>{
-      const d=JSON.parse(e.data);const p=parseFloat(d.p);
-      if(!p||isNaN(p))return;
-      pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();
-      renderPrice(p);updatePnL();updateSigUser();
-    };
-    ws.onerror=()=>ws.close();
-    ws.onclose=()=>{wst=setTimeout(connectWS,3000);};
-  }catch(err){
-    console.warn('WS failed, polling fallback');
-    pollPrice();
+  // Intentar primero puerto 443 (más permisivo en firewalls/CSP)
+  const WS_URLS=['wss://stream.binance.com:443/ws/btcusdt@trade','wss://stream.binance.com:9443/ws/btcusdt@trade'];
+  let urlIdx=0;
+
+  function tryConnect(){
+    if(wsPollFallback)return;
+    try{
+      ws=new WebSocket(WS_URLS[urlIdx]);
+      let opened=false;
+      const timeout=setTimeout(()=>{
+        if(!opened){
+          ws.close();
+          urlIdx=(urlIdx+1)%WS_URLS.length;
+          if(urlIdx===0){
+            // Tried all URLs, switch to polling
+            wsPollFallback=true;
+            setMeta('🟡 REST polling');
+            pollPrice();
+            return;
+          }
+          tryConnect();
+        }
+      },4000);
+
+      ws.onopen=()=>{
+        opened=true;clearTimeout(timeout);
+        setMeta('<span class="ldot"></span>LIVE · Binance');
+        if(wst){clearTimeout(wst);wst=null;}
+      };
+      ws.onmessage=e=>{
+        const d=JSON.parse(e.data);const p=parseFloat(d.p);
+        if(!p||isNaN(p))return;
+        pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();
+        renderPrice(p);updatePnL();updateSigUser();
+      };
+      ws.onerror=()=>{ clearTimeout(timeout); };
+      ws.onclose=()=>{
+        if(wsPollFallback)return;
+        wst=setTimeout(()=>{
+          urlIdx=(urlIdx+1)%WS_URLS.length;
+          tryConnect();
+        },3000);
+      };
+    }catch(err){
+      wsPollFallback=true;
+      setMeta('🟡 Polling');
+      pollPrice();
+    }
   }
+  tryConnect();
 }
 
-// Fallback if WS blocked
+function setMeta(html){
+  const m=document.getElementById('pmeta');if(m)m.innerHTML=html;
+}
+
+// Polling fallback cuando WebSocket está bloqueado por CSP
+let pollRunning=false;
 async function pollPrice(){
-  try{
-    const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
-    const d=await r.json();const p=parseFloat(d.price);
-    if(p&&!isNaN(p)){pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();renderPrice(p);updatePnL();updateSigUser();}
-  }catch{}
-  setTimeout(pollPrice,3000);
+  if(pollRunning)return;pollRunning=true;
+  const poll=async()=>{
+    try{
+      const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+      const d=await r.json();const p=parseFloat(d.price);
+      if(p&&!isNaN(p)){pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();renderPrice(p);updatePnL();updateSigUser();}
+    }catch(e){
+      // Si Binance REST también falla, usar precio del signal ML
+      if(signal&&signal.current_price&&!lp){lp=signal.current_price;renderPrice(lp);}
+    }
+    setTimeout(poll,3000);
+  };
+  poll();
 }
 
-// ─── PRICE RENDER ─────────────────────────────────────────
+// ─── PRICE RENDER ────────────────────────────────────────────────────────
 function renderPrice(p){
-  const el=document.getElementById('pv'),card=document.getElementById('pcrd');
-  if(!el)return;
+  const el=document.getElementById('pv'),card=document.getElementById('pcrd');if(!el)return;
   const dir=pp===null?'':p>pp?'up':p<pp?'down':'';
   el.textContent=fp(p);
   el.classList.remove('pg','pr');card.classList.remove('fg','fr');
@@ -424,15 +468,16 @@ function renderPrice(p){
   if(signal)drawSpk(spk,sh(signal.action));
 }
 
-// ─── SIGNAL ───────────────────────────────────────────────
+// ─── SIGNAL ML ───────────────────────────────────────────────────────────
 async function fetchSig(){
   try{
     signal=await api('/api/signal');
-    if(!lp){lp=signal.current_price;spk.push(lp);}
+    // Si WS no llegó todavía, usar precio del signal
+    if(!lp&&signal.current_price){lp=signal.current_price;spk.push(lp);renderPrice(lp);}
     renderSigBase();updatePnL();updateSigUser();
   }catch(e){
     const b=document.getElementById('sbadge');
-    if(b)b.textContent='⚠ Sin señal ('+e.message+')';
+    if(b){b.textContent='⚠ Señal no disponible';b.className='sbadge hold';}
   }
 }
 
@@ -447,42 +492,33 @@ function renderSigBase(){
   const cb=document.getElementById('cbar');if(cb)cb.style.cssText='width:'+signal.confidence+'%;background:'+hex;
   const sm=document.getElementById('smet');if(sm)sm.style.display='grid';
   const rc=signal.rsi<35?'var(--green)':signal.rsi>65?'var(--red)':'var(--text2)';
-  sm_(document.getElementById('mrsi'),signal.rsi,rc);
+  sm_(document.getElementById('mrsi'),signal.rsi.toFixed(0),rc);
   sm_(document.getElementById('mmacd'),signal.macd>0?'▲ +':'▼ −',signal.macd>0?'var(--green)':'var(--red)');
   const mlv=(signal.ml_pred>0?'+':'')+(signal.ml_pred*100).toFixed(2)+'%';
   const mlc=signal.ml_pred>0.002?'var(--green)':signal.ml_pred<-0.002?'var(--red)':'var(--yellow)';
   sm_(document.getElementById('mml'),mlv,mlc);
 }
 function sm_(el,val,color){if(el){el.textContent=val;el.style.color=color;}}
-
-function setSigCard(hex){
-  const c=document.getElementById('scrd');if(!c)return;
-  c.style.borderColor=hex+'44';c.style.boxShadow='0 0 20px '+hex+'15';
-}
-function setSigBadge(lbl,cls){
-  const b=document.getElementById('sbadge');if(!b)return;
-  b.textContent=lbl;b.className='sbadge '+cls;
-}
+function setSigCard(hex){const c=document.getElementById('scrd');if(!c)return;c.style.borderColor=hex+'44';c.style.boxShadow='0 0 20px '+hex+'15';}
+function setSigBadge(lbl,cls){const b=document.getElementById('sbadge');if(!b)return;b.textContent=lbl;b.className='sbadge '+cls;}
 function sh(a){return a==='COMPRAR'?'#00ff9c':a==='VENDER'?'#ff4d4f':'#f0b90b';}
 
-// ─── OPERATIONS ───────────────────────────────────────────
+// ─── OPERATIONS ──────────────────────────────────────────────────────────
 async function reg(tipo){
   const val=parseFloat(document.getElementById('pinp').value);
   const res=document.getElementById('pnlsec');
-  if(!val||val<=0){if(res)res.innerHTML='<p style="color:var(--red);font-size:13px;padding:4px 0">⚠ Ingresa un precio válido</p>';return;}
+  if(!val||val<=0){if(res)res.innerHTML='<p style="color:var(--red);padding:8px 0;font-size:13px">⚠ Ingresa un precio válido</p>';return;}
   opT=tipo;opP=val;
   document.getElementById('bbuy').classList.toggle('active',tipo==='compra');
   document.getElementById('bsell').classList.toggle('active',tipo==='venta');
   try{const op=await api('/api/operacion',{method:'POST',body:{tipo,precio:val}});hist.unshift(op);}catch{}
   updatePnL();updateSigUser();renderAccum();
 }
-
 function onIC(){
   if(!opT)return;
   const val=parseFloat(document.getElementById('pinp').value);
   if(val>0){opP=val;updatePnL();updateSigUser();}
 }
-
 async function loadHist(){
   try{
     hist=await api('/api/operaciones');
@@ -495,7 +531,6 @@ async function loadHist(){
   }catch{}
   renderHist();renderAccum();
 }
-
 async function doReset(){
   if(!confirm('¿Borrar todo el historial?'))return;
   try{await api('/api/operaciones',{method:'DELETE'});}catch{}
@@ -508,19 +543,17 @@ async function doReset(){
   renderHist();renderSigBase();
 }
 
-// ─── PNL ──────────────────────────────────────────────────
+// ─── PNL ─────────────────────────────────────────────────────────────────
 function calcAcum(){
   const sorted=[...hist].reverse();let total=0,trades=0,pend=null;
   for(const op of sorted){
-    if(op.tipo==='compra'&&!pend){pend=op.precio;}
+    if(op.tipo==='compra'&&!pend)pend=op.precio;
     else if(op.tipo==='venta'&&pend){total+=(op.precio-pend)/pend*100;trades++;pend=null;}
   }
   return{total:total.toFixed(2),trades};
 }
-
 function renderAccum(){
-  const a=calcAcum();
-  const tr=document.getElementById('totrow'),tv=document.getElementById('totval');
+  const a=calcAcum(),tr=document.getElementById('totrow'),tv=document.getElementById('totval');
   if(!tr||!tv)return;
   if(a.trades===0){tr.style.display='none';return;}
   tr.style.display='flex';
@@ -528,14 +561,11 @@ function renderAccum(){
   tv.textContent=(v>=0?'+':'')+a.total+'%  ('+a.trades+' trades)';
   tv.className='totval '+(v>0?'pos':v<0?'neg':'');
 }
-
 function updatePnL(){
   const el=document.getElementById('pnlsec');if(!el)return;
   if(!opT||!opP||!lp){el.innerHTML='';return;}
-  const rawPct=(lp-opP)/opP*100;
-  const gan=opT==='compra'?rawPct:-rawPct;
-  const pos=gan>=0,lbl=opT==='compra'?'COMPRÉ':'VENDÍ';
-  const sign=gan>=0?'+':'';
+  const rawPct=(lp-opP)/opP*100,gan=opT==='compra'?rawPct:-rawPct,pos=gan>=0;
+  const lbl=opT==='compra'?'COMPRÉ':'VENDÍ',sign=gan>=0?'+':'';
   const tgt=renderTargetHTML(lp,gan);
   el.innerHTML='<div class="card pnlc '+(pos?'pos':'neg')+'">'
     +'<div class="pnlrow"><div>'
@@ -543,10 +573,10 @@ function updatePnL(){
     +'<div class="pnlv '+(pos?'pos':'neg')+'">'+sign+gan.toFixed(2)+'%</div>'
     +'<div class="pnla">'+(pos?'Ganancia':'Pérdida')+': '+sign+fp(lp-opP,2)+' por BTC</div>'
     +'</div>'
-    +'<div class="pnlr"><div>Entrada</div><div style="font-weight:700">'+fp(opP)+'</div><div style="margin-top:6px">Actual</div><div style="font-weight:700;color:#fff">'+fp(lp)+'</div></div>'
+    +'<div class="pnlr"><div>Entrada</div><div style="font-weight:700">'+fp(opP)+'</div>'
+    +'<div style="margin-top:6px">Actual</div><div style="font-weight:700;color:#fff">'+fp(lp)+'</div></div>'
     +'</div>'+tgt+'</div>';
 }
-
 function renderTargetHTML(p,gan){
   if(!signal||!signal.bb)return'';
   const isc=opT==='compra';
@@ -555,15 +585,15 @@ function renderTargetHTML(p,gan){
   const tPrice=isc?opP*(1+pctC/100):opP*(1-pctC/100);
   const tHex=isc?'#00ff9c':'#f0b90b';
   const tLbl=isc?'🎯 VENDER CUANDO LLEGUE A':'🎯 RECOMPRAR CUANDO LLEGUE A';
-  const tPct='Objetivo: '+(isc?'+':'-')+pctC.toFixed(1)+'% (rango 1–5%)';
   const tip=isc?tipC(p,gan):tipV(p,gan);
   return'<div class="tbox" style="background:'+tHex+'10;border:1px solid '+tHex+'33;margin-top:10px">'
     +'<div class="tboxh" style="color:'+tHex+'">'+tLbl+'</div>'
-    +'<div class="tbrow"><div><div class="tpbig" style="color:'+tHex+'">'+fp(tPrice)+'</div><div class="tpsm">'+tPct+'</div></div>'
-    +'<div class="tbbcol"><div>BB sup: '+fp(signal.bb.upper)+'</div><div>BB med: '+fp(signal.bb.middle)+'</div><div>BB inf: '+fp(signal.bb.lower)+'</div></div></div>'
+    +'<div class="tbrow"><div><div class="tpbig" style="color:'+tHex+'">'+fp(tPrice)+'</div>'
+    +'<div class="tpsm">Objetivo: '+(isc?'+':'-')+pctC.toFixed(1)+'% (rango 1–5%)</div></div>'
+    +'<div class="tbbcol"><div>BB sup: '+fp(signal.bb.upper)+'</div><div>BB med: '+fp(signal.bb.middle)+'</div>'
+    +'<div>BB inf: '+fp(signal.bb.lower)+'</div></div></div>'
     +'<div class="ttip">'+tip+'</div></div>';
 }
-
 function tipC(p,g){
   if(!signal)return'';
   if(signal.rsi>70)return'⚠️ RSI en sobrecompra ('+signal.rsi.toFixed(0)+'). Considera venta parcial.';
@@ -578,7 +608,6 @@ function tipV(p,g){
   if(p>opP)return'⚠️ BTC subió desde tu venta. Evalúa reentrada si ML sigue alcista.';
   return'📊 RSI '+signal.rsi.toFixed(0)+'. Sin señal clara. Espera al target antes de recomprar.';
 }
-
 function updateSigUser(){
   if(!signal||!opT||!opP||!lp){renderSigBase();return;}
   const p=lp,rawPct=(p-opP)/opP*100,gan=opT==='compra'?rawPct:-rawPct;
@@ -586,77 +615,103 @@ function updateSigUser(){
   const mlBull=signal.ml_pred>.002,mlBear=signal.ml_pred<-.002;
   let lbl,cls,hex;
   if(opT==='compra'){
-    if(signal.rsi>75||p>opP*1.05)              {lbl='🔴 VENDER (SOBRECOMPRA)'; cls='sell';hex='#ff4d4f';}
-    else if(p<opP*.94&&!mlBull)                {lbl='⚠️ STOP LOSS ('+s+g+'%)'; cls='sell';hex='#ff4d4f';}
-    else if(p>opP&&(mlBull||signal.action==='COMPRAR')){lbl='🟢 HOLD (GANANCIA '+s+g+'%)';cls='buy'; hex='#00ff9c';}
-    else if(p<opP&&mlBear)                     {lbl='🟡 PRECAUCIÓN ('+s+g+'%)'; cls='hold';hex='#f0b90b';}
-    else                                       {lbl='🟡 HOLD ('+s+g+'%)';       cls='hold';hex='#f0b90b';}
+    if(signal.rsi>75||p>opP*1.05)             {lbl='🔴 VENDER (SOBRECOMPRA)';       cls='sell';hex='#ff4d4f';}
+    else if(p<opP*.94&&!mlBull)               {lbl='⚠️ STOP LOSS ('+s+g+'%)';       cls='sell';hex='#ff4d4f';}
+    else if(p>opP&&(mlBull||signal.action==='COMPRAR')){lbl='🟢 HOLD (GANANCIA '+s+g+'%)';  cls='buy'; hex='#00ff9c';}
+    else if(p<opP&&mlBear)                    {lbl='🟡 PRECAUCIÓN ('+s+g+'%)';      cls='hold';hex='#f0b90b';}
+    else                                      {lbl='🟡 HOLD ('+s+g+'%)';            cls='hold';hex='#f0b90b';}
   }else{
-    if(p<opP&&signal.rsi<30)                   {lbl='🟢 REENTRADA ÓPTIMA';      cls='buy'; hex='#00ff9c';}
-    else if(p<opP&&mlBull)                     {lbl='🟢 REENTRADA POSIBLE';     cls='buy'; hex='#00ff9c';}
-    else if(p<opP)                             {lbl='✅ BIEN VENDIDO ('+s+g+'%)';cls='buy'; hex='#00ff9c';}
-    else if(p>opP*1.03&&mlBull)                {lbl='⚠️ REENTRADA URGENTE';     cls='hold';hex='#f0b90b';}
-    else                                       {lbl='⏳ ESPERAR';               cls='hold';hex='#f0b90b';}
+    if(p<opP&&signal.rsi<30)                  {lbl='🟢 REENTRADA ÓPTIMA';           cls='buy'; hex='#00ff9c';}
+    else if(p<opP&&mlBull)                    {lbl='🟢 REENTRADA POSIBLE';          cls='buy'; hex='#00ff9c';}
+    else if(p<opP)                            {lbl='✅ BIEN VENDIDO ('+s+g+'%)';    cls='buy'; hex='#00ff9c';}
+    else if(p>opP*1.03&&mlBull)               {lbl='⚠️ REENTRADA URGENTE';         cls='hold';hex='#f0b90b';}
+    else                                      {lbl='⏳ ESPERAR';                    cls='hold';hex='#f0b90b';}
   }
   setSigCard(hex);setSigBadge(lbl,cls);
   const cb=document.getElementById('cbar');if(cb)cb.style.background=hex;
   renderAccum();
 }
 
-// ─── HISTORIAL ────────────────────────────────────────────
+// ─── HISTORIAL ───────────────────────────────────────────────────────────
 function renderHist(){
   const el=document.getElementById('hbody');if(!el)return;
   if(!hist.length){el.innerHTML='<div class="empty">Sin operaciones registradas</div>';return;}
   const rows=hist.map((op,i)=>{
-    let res='—';if(op.tipo==='venta'){const b=hist.slice(i+1).find(o=>o.tipo==='compra');if(b){const p=((op.precio-b.precio)/b.precio*100).toFixed(2);res='<span class="'+(parseFloat(p)>=0?'tb':'ts')+'">'+(parseFloat(p)>=0?'+':'')+p+'%</span>';}}
-    const d=new Date(op.fecha);const ds=d.toLocaleDateString('es-MX',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    let res='—';
+    if(op.tipo==='venta'){const b=hist.slice(i+1).find(o=>o.tipo==='compra');if(b){const p=((op.precio-b.precio)/b.precio*100).toFixed(2);res='<span class="'+(parseFloat(p)>=0?'tb':'ts')+'">'+(parseFloat(p)>=0?'+':'')+p+'%</span>';}}
+    const d=new Date(op.fecha),ds=d.toLocaleDateString('es-MX',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
     return'<tr><td class="'+(op.tipo==='compra'?'tb':'ts')+'">'+(op.tipo==='compra'?'▲ COMPRA':'▼ VENTA')+'</td><td>'+fp(op.precio)+'</td><td>'+res+'</td><td style="color:var(--muted);font-size:11px">'+ds+'</td></tr>';
   }).join('');
   el.innerHTML='<table class="htbl"><thead><tr><th>TIPO</th><th>PRECIO</th><th>RESULTADO</th><th>FECHA</th></tr></thead><tbody>'+rows+'</tbody></table>';
   renderAccum();
 }
 
-// ─── IA ───────────────────────────────────────────────────
+// ─── IA ──────────────────────────────────────────────────────────────────
 async function doAI(){
-  if(!signal)return;
+  if(!signal){alert('Espera a que cargue la señal ML primero.');return;}
   const btn=document.getElementById('iabtn'),out=document.getElementById('iaout');
-  btn.disabled=true;btn.textContent='✦ Analizando…';out.className='iaph';out.textContent='Consultando IA…';
-  const p=lp||signal.current_price,raw=opP?((p-opP)/opP*100):null,gain=raw!==null?(opT==='compra'?raw:-raw):null,a=calcAcum();
+  if(!btn||!out)return;
+  btn.disabled=true;btn.textContent='✦ Analizando…';
+  out.className='iaph';out.textContent='Consultando IA con tus datos…';
+  const p=lp||signal.current_price;
+  const raw=opP?((p-opP)/opP*100):null;
+  const gain=raw!==null?(opT==='compra'?raw:-raw):null;
+  const a=calcAcum();
   try{
-    const d=await api('/api/analyze',{method:'POST',body:{signal:{...signal,current_price:p},tipoOperacion:opT,precioUsuario:opP,ganancia:gain!==null?gain.toFixed(2):null,historialResumen:a.trades>0?a.trades+' trades, acumulado '+a.total+'%':null}});
+    const d=await api('/api/analyze',{
+      method:'POST',
+      body:{
+        signal:{...signal,current_price:p},
+        tipoOperacion:opT,
+        precioUsuario:opP,
+        ganancia:gain!==null?gain.toFixed(2):null,
+        historialResumen:a.trades>0?a.trades+' trades, acumulado '+a.total+'%':null
+      }
+    });
     out.className='iaout';out.textContent=d.analysis??'Sin respuesta.';
-  }catch(e){out.className='iaout';out.textContent=e.message||'No se pudo obtener el análisis. Intenta de nuevo.';}
+  }catch(e){
+    out.className='iaout';out.textContent='Error: '+e.message;
+  }
   btn.disabled=false;btn.textContent='✦ Analizar con IA';
 }
 
-// ─── CHART ────────────────────────────────────────────────
+// ─── CHART ───────────────────────────────────────────────────────────────
 function initChart(){
   const el=document.getElementById('chcont');if(!el)return;
-  // LightweightCharts v3 API
   chart=LightweightCharts.createChart(el,{
-    width:el.clientWidth,height:260,
+    width:el.clientWidth,height:280,
     layout:{backgroundColor:'#070e1c',textColor:'#718096'},
     grid:{vertLines:{color:'#1a2235'},horzLines:{color:'#1a2235'}},
     crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
     rightPriceScale:{borderColor:'#1e2d45'},
     timeScale:{borderColor:'#1e2d45',timeVisible:true,secondsVisible:false}
   });
-  cand=chart.addCandlestickSeries({upColor:'#00ff9c',downColor:'#ff4d4f',borderUpColor:'#00ff9c',borderDownColor:'#ff4d4f',wickUpColor:'#00ff9c',wickDownColor:'#ff4d4f'});
+  cand=chart.addCandlestickSeries({
+    upColor:'#00ff9c',downColor:'#ff4d4f',
+    borderUpColor:'#00ff9c',borderDownColor:'#ff4d4f',
+    wickUpColor:'#00ff9c',wickDownColor:'#ff4d4f'
+  });
   loadK('1m');
-  const ro=new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth}));ro.observe(el);
+  new ResizeObserver(()=>chart&&chart.applyOptions({width:el.clientWidth})).observe(el);
 }
-
 async function loadK(tf){
   const ldr=document.getElementById('chldr');if(ldr)ldr.style.display='flex';
   try{
-    const r=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval='+tf+'&limit=150');
+    const r=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval='+tf+'&limit=200');
+    if(!r.ok)throw new Error('Binance '+r.status);
     const data=await r.json();
-    cand.setData(data.map(k=>({time:Math.floor(k[0]/1000),open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])})));
+    if(!Array.isArray(data)||!data.length)throw new Error('Empty data');
+    cand.setData(data.map(k=>({
+      time:Math.floor(k[0]/1000),
+      open:parseFloat(k[1]),high:parseFloat(k[2]),
+      low:parseFloat(k[3]),close:parseFloat(k[4])
+    })));
     chart.timeScale().fitContent();
-  }catch{if(ldr)ldr.textContent='No se pudo cargar el gráfico.';return;}
-  if(ldr)ldr.style.display='none';
+    if(ldr)ldr.style.display='none';
+  }catch(e){
+    if(ldr){ldr.style.display='flex';ldr.textContent='No se pudo cargar el gráfico: '+e.message;}
+  }
 }
-
 function setTF(tf,btn){
   curTF=tf;
   document.querySelectorAll('.tfbtn').forEach(b=>b.classList.remove('active'));
@@ -664,56 +719,87 @@ function setTF(tf,btn){
   loadK(tf);
 }
 
-// ─── MARKET ───────────────────────────────────────────────
+// ─── MERCADO ─────────────────────────────────────────────────────────────
+const COIN_NAMES={BTC:'Bitcoin',ETH:'Ethereum',SOL:'Solana',BNB:'BNB',XRP:'Ripple',ADA:'Cardano',DOGE:'Dogecoin',AVAX:'Avalanche',DOT:'Polkadot',LINK:'Chainlink',MATIC:'Polygon',NEAR:'NEAR'};
+const COIN_ICONS={BTC:'🟡',ETH:'⚡',SOL:'🔥',BNB:'💛',XRP:'💜',ADA:'🔵',DOGE:'🐕',AVAX:'🔺',DOT:'⬤',LINK:'🔗',MATIC:'🟣',NEAR:'🟩'};
+
 async function loadMkt(){
   const el=document.getElementById('mbody');
+  if(el&&(el.innerHTML.includes('mldr')||el.innerHTML===''))
+    el.innerHTML='<div class="mldr">Cargando datos de mercado…</div>';
   try{
     const data=await api('/api/market');
-    const bar=document.getElementById('abar'),all=[...(data.alerts||[])];
-    if(data.arbitrage)all.push({msg:'🔄 '+data.arbitrage.recommendation+' — '+data.arbitrage.reason,color:'yellow'});
-    if(all.length){bar.style.display='flex';bar.innerHTML=all.map(a=>'<span class="achip '+a.color+'">'+a.msg+'</span>').join('');}
-    else bar.style.display='none';
-    const EM={BTC:'🟡',ETH:'⚡',SOL:'🔥',BNB:'💛',XRP:'💜',ADA:'🔵'};
+
+    // Alerts bar
+    const bar=document.getElementById('abar');
+    const allAlerts=[...(data.alerts||[])];
+    if(data.arbitrage)allAlerts.unshift({msg:'💡 '+data.arbitrage.recommendation+' — '+data.arbitrage.reason,color:'yellow'});
+    if(allAlerts.length){
+      bar.style.display='flex';
+      bar.innerHTML=allAlerts.map(a=>'<span class="achip '+a.color+'">'+a.msg+'</span>').join('');
+    }else bar.style.display='none';
+
+    if(!data.coins||!data.coins.length){
+      el.innerHTML='<div class="empty">Sin datos disponibles. Intenta de nuevo.</div>';return;
+    }
+
     const rows=data.coins.map((c,i)=>{
-      const ch=c.change24h,pos=ch>=0,col=pos?'var(--green)':'var(--red)',bw=Math.min(Math.abs(ch)/10*100,100);
-      const stag=ch>4?'<span class="ctag bull">momentum</span>':ch<-4?'<span class="ctag bear">sobreventa</span>':'';
+      const ch=c.change24h,pos=ch>=0;
+      const col=pos?'var(--green)':'var(--red)';
+      const bw=Math.min(Math.abs(ch)/10*100,100);
+      const sig=c.signal||{label:'🟡 MANTENER',reason:'Sin señal'};
+      const sigColor=sig.action==='COMPRAR'?'var(--green)':sig.action==='VENDER'?'var(--red)':'var(--yellow)';
       const vol=c.volume>=1e9?'$'+(c.volume/1e9).toFixed(1)+'B':'$'+(c.volume/1e6).toFixed(0)+'M';
-      return'<div class="coin"><div class="crk">'+(i+1)+'</div><div class="cion">'+(EM[c.symbol]||'◆')+'</div><div class="cinfo"><div class="csrow"><span class="cname">'+c.symbol+'</span>'+stag+'</div><div class="cvol">'+vol+'</div><div class="mbw"><div class="mb" style="width:'+bw+'%;background:'+(pos?'var(--green)':'var(--red)')+'"></div></div></div><div class="cright"><div class="cpval">'+fp(c.price,2)+'</div><div class="cchval" style="color:'+col+'">'+(pos?'+':'')+ch.toFixed(2)+'%</div></div></div>';
+      const name=COIN_NAMES[c.symbol]||c.symbol;
+      const icon=COIN_ICONS[c.symbol]||'◆';
+      return '<div class="coin">'
+        +'<div class="crk">'+(i+1)+'</div>'
+        +'<div class="cion">'+icon+'</div>'
+        +'<div class="cinfo">'
+          +'<div class="csrow"><span class="cname">'+c.symbol+'</span>'
+          +'<span style="font-size:10px;color:var(--sub)">'+name+'</span></div>'
+          +'<div class="cvol">Vol '+vol+'</div>'
+          +'<div class="mbw"><div class="mb" style="width:'+bw+'%;background:'+(pos?'rgba(0,255,156,.3)':'rgba(255,77,79,.3)')+'"></div></div>'
+        +'</div>'
+        +'<div class="cright">'
+          +'<div class="cpval">'+fp(c.price,c.price<10?4:c.price<1000?2:0)+'</div>'
+          +'<div class="cchval" style="color:'+col+'">'+(pos?'+':'')+ch.toFixed(2)+'%</div>'
+          +'<div class="csig" style="color:'+sigColor+';font-size:10px;margin-top:3px;font-weight:600">'+sig.label+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="creason" style="padding:4px 0 10px 50px;font-size:10px;color:var(--sub)">'+sig.reason+'</div>';
     }).join('');
-    const arb=data.arbitrage?'<div class="arbcard"><div class="arblbl">🔄 Oportunidad de rotación</div><div class="arbrec">'+data.arbitrage.recommendation+'</div><div class="arbwhy">'+data.arbitrage.reason+'</div></div>':'';
-    el.innerHTML=rows+arb;
-  }catch{el.innerHTML='<div class="empty">Error cargando datos del mercado. Intenta de nuevo.</div>';}
+
+    el.innerHTML=rows;
+  }catch(e){
+    if(el)el.innerHTML='<div class="empty">Error cargando el mercado. Intenta de nuevo.</div>';
+  }
 }
 
-// ─── ADMIN ────────────────────────────────────────────────
+// ─── ADMIN ───────────────────────────────────────────────────────────────
 async function loadAdmin(){try{const u=await api('/api/admin/users');renderAdmin(u);}catch{}}
 function renderAdmin(users){
   if(!users.length){document.getElementById('abody').innerHTML='<div class="empty">Sin usuarios</div>';return;}
-  // Build rows with data attributes instead of inline handlers
-  const rows=users.map(u=>'<tr>'
-    +'<td>'+u.id+'</td>'
-    +'<td style="font-weight:600">'+u.username+'</td>'
+  const rows=users.map(u=>'<tr><td>'+u.id+'</td><td style="font-weight:600">'+u.username+'</td>'
     +'<td class="'+(u.role==='admin'?'ra':'ru')+'">'+u.role+'</td>'
     +'<td><div class="brow">'
     +(u.id!==ME.id?'<button class="bsm bd" data-action="del" data-id="'+u.id+'" data-name="'+u.username+'">Eliminar</button>':'')
     +'<button class="bsm bw" data-action="rst" data-id="'+u.id+'" data-name="'+u.username+'">Reset hist.</button>'
     +'<button class="bsm bi" data-action="pwd" data-id="'+u.id+'" data-name="'+u.username+'">Contraseña</button>'
-    +'</div></td></tr>'
-  ).join('');
-  document.getElementById('abody').innerHTML='<table class="atbl"><thead><tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr></thead><tbody>'+rows+'</tbody></table>';
-  // Attach listeners via delegation
-  document.getElementById('abody').addEventListener('click',adminDelegate);
+    +'</div></td></tr>').join('');
+  const ab=document.getElementById('abody');
+  ab.innerHTML='<table class="atbl"><thead><tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  ab.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-action]');if(!btn)return;
+    const{action,id,name}=btn.dataset;
+    if(action==='del')aDel(+id,name);
+    if(action==='rst')aRH(+id,name);
+    if(action==='pwd')aPwd(+id,name);
+  });
 }
-function adminDelegate(e){
-  const btn=e.target.closest('[data-action]');if(!btn)return;
-  const {action,id,name}=btn.dataset;
-  if(action==='del')aDel(parseInt(id),name);
-  if(action==='rst')aRH(parseInt(id),name);
-  if(action==='pwd')aPwd(parseInt(id),name);
-}
-async function aDel(id,name){if(!confirm('¿Eliminar "'+name+'"?'))return;try{await api('/api/admin/users/'+id,{method:'DELETE'});loadAdmin();}catch(e){alert(e.message);}}
-async function aRH(id,name){if(!confirm('¿Resetear historial de "'+name+'"?'))return;try{await api('/api/admin/users/'+id+'/operaciones',{method:'DELETE'});alert('Historial reseteado');}catch{}}
-async function aPwd(id,name){const p=prompt('Nueva contraseña para "'+name+'":');if(!p||p.length<4){alert('Contraseña muy corta');return;}try{await api('/api/admin/users/'+id+'/password',{method:'PATCH',body:{password:p}});alert('Contraseña actualizada');}catch(e){alert(e.message);}}
+async function aDel(id,n){if(!confirm('¿Eliminar "'+n+'"?'))return;try{await api('/api/admin/users/'+id,{method:'DELETE'});loadAdmin();}catch(e){alert(e.message);}}
+async function aRH(id,n){if(!confirm('¿Resetear historial de "'+n+'"?'))return;try{await api('/api/admin/users/'+id+'/operaciones',{method:'DELETE'});alert('Historial reseteado');}catch{}}
+async function aPwd(id,n){const p=prompt('Nueva contraseña para "'+n+'":');if(!p||p.length<4)return;try{await api('/api/admin/users/'+id+'/password',{method:'PATCH',body:{password:p}});alert('Contraseña actualizada');}catch(e){alert(e.message);}}
 async function createUser(){
   const u=document.getElementById('nuu').value.trim(),p=document.getElementById('nup').value,r=document.getElementById('nur').value,msg=document.getElementById('amsg');
   if(!u||!p){msg.style.color='var(--red)';msg.textContent='Completa todos los campos';return;}
@@ -725,7 +811,7 @@ async function createUser(){
   }catch(e){msg.style.color='var(--red)';msg.textContent=e.message;}
 }
 
-// ─── TABS ─────────────────────────────────────────────────
+// ─── TABS ────────────────────────────────────────────────────────────────
 function showTab(t){
   document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
@@ -737,67 +823,42 @@ function showTab(t){
   if(t==='dash'&&chart){const c=document.getElementById('chcont');if(c)chart.applyOptions({width:c.clientWidth});}
 }
 
-// ─── SPARKLINE ────────────────────────────────────────────
+// ─── SPARKLINE ───────────────────────────────────────────────────────────
 function drawSpk(prices,hex){
-  if(prices.length<2)return;const W=100,H=32,step=Math.max(1,Math.floor(prices.length/40));
-  const s=prices.filter((_,i)=>i%step===0);const mn=Math.min(...s),mx=Math.max(...s),r=mx-mn||1;
+  if(!prices||prices.length<2)return;
+  const W=100,H=32,step=Math.max(1,Math.floor(prices.length/40));
+  const s=prices.filter((_,i)=>i%step===0);
+  const mn=Math.min(...s),mx=Math.max(...s),r=mx-mn||1;
   const pts=s.map((p,i)=>`${(i/(s.length-1))*W},${H-((p-mn)/r)*(H-2)+1}`).join(' ');
   const el=document.getElementById('sparkline');if(!el)return;
-  el.innerHTML='<defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="'+hex+'" stop-opacity=".2"/><stop offset="100%" stop-color="'+hex+'" stop-opacity="1"/></linearGradient></defs><polyline points="'+pts+'" fill="none" stroke="url(#sg)" stroke-width="1.8" stroke-linejoin="round"/>';
+  el.innerHTML='<defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0">'
+    +'<stop offset="0%" stop-color="'+hex+'" stop-opacity=".2"/>'
+    +'<stop offset="100%" stop-color="'+hex+'" stop-opacity="1"/>'
+    +'</linearGradient></defs>'
+    +'<polyline points="'+pts+'" fill="none" stroke="url(#sg)" stroke-width="1.8" stroke-linejoin="round"/>';
 }
-
 function fp(n,d=0){if(n==null||isNaN(n))return'—';return'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});}
 
-// ─── EVENT LISTENERS (replaces all inline onclick) ────────
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
-  // Login
-  const lbtn=document.getElementById('lbtn');
-  if(lbtn)lbtn.addEventListener('click',doLogin);
+  const g=id=>document.getElementById(id);
+  const on=(id,ev,fn)=>{const el=g(id);if(el)el.addEventListener(ev,fn);};
 
-  // Logout
-  const lout=document.getElementById('lout');
-  if(lout)lout.addEventListener('click',doLogout);
+  on('lbtn','click',doLogin);
+  on('lout','click',doLogout);
+  on('pinp','input',onIC);
+  on('bbuy','click',()=>reg('compra'));
+  on('bsell','click',()=>reg('venta'));
+  on('iabtn','click',doAI);
+  on('rbtn2','click',doReset);   // solo en Historial tab
+  on('cbtn','click',createUser);
 
-  // Tab nav — use data-tab attribute
-  document.querySelectorAll('.tbtn[data-tab]').forEach(btn=>{
-    btn.addEventListener('click',()=>showTab(btn.dataset.tab));
-  });
+  document.querySelectorAll('.tbtn[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+  document.querySelectorAll('.tfbtn[data-tf]').forEach(b=>b.addEventListener('click',()=>setTF(b.dataset.tf,b)));
 
-  // Price input
-  const pinp=document.getElementById('pinp');
-  if(pinp)pinp.addEventListener('input',onIC);
+  on('lp','keydown',e=>{if(e.key==='Enter')doLogin();});
+  on('lu','keydown',e=>{if(e.key==='Enter'){const lp=g('lp');if(lp)lp.focus();}});
 
-  // Buy / Sell
-  const bbuy=document.getElementById('bbuy');
-  if(bbuy)bbuy.addEventListener('click',()=>reg('compra'));
-  const bsell=document.getElementById('bsell');
-  if(bsell)bsell.addEventListener('click',()=>reg('venta'));
-
-  // IA
-  const iabtn=document.getElementById('iabtn');
-  if(iabtn)iabtn.addEventListener('click',doAI);
-
-  // Reset buttons (dashboard + historial tab)
-  document.querySelectorAll('#rbtn1,#rbtn2').forEach(b=>{
-    if(b)b.addEventListener('click',doReset);
-  });
-
-  // TF buttons
-  document.querySelectorAll('.tfbtn[data-tf]').forEach(btn=>{
-    btn.addEventListener('click',()=>setTF(btn.dataset.tf,btn));
-  });
-
-  // Admin create user
-  const cbtn=document.getElementById('cbtn');
-  if(cbtn)cbtn.addEventListener('click',createUser);
-
-  // Enter on login
-  const lp_el=document.getElementById('lp');
-  if(lp_el)lp_el.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-  const lu_el=document.getElementById('lu');
-  if(lu_el)lu_el.addEventListener('keydown',e=>{if(e.key==='Enter'){ const lp2=document.getElementById('lp');if(lp2)lp2.focus();}});
-
-  // Auto-start if token present
   if(TOKEN&&ME)startApp();
 });
 </script>
