@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
   <title>BTC Oracle</title>
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"></script>
   <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -206,7 +206,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
     <div class="ll"><div class="brand">₿ BTC ORACLE</div><div class="sub">TRADING PLATFORM</div></div>
     <div class="fld"><label>Usuario</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div>
     <div class="fld"><label>Contraseña</label><input id="lp" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
-    <button class="lbtn" onclick="doLogin()">Ingresar</button>
+    <button class="lbtn" id="lbtn">Ingresar</button>
     <div class="lerr" id="le"></div>
   </div>
 </div>
@@ -216,17 +216,17 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
     <div class="topnav-brand">₿ BTC Oracle</div>
     <div class="topnav-right">
       <div class="ubadge"><span class="uname" id="nvu"></span><span class="rtag" id="nvr" style="display:none"></span></div>
-      <button class="lout" onclick="doLogout()">Salir</button>
+      <button class="lout" id="lout">Salir</button>
     </div>
   </header>
 
   <div id="abar"></div>
 
   <nav class="tnav">
-    <button class="tbtn active" id="tn-dash"   onclick="showTab('dash')">📊 Dashboard</button>
-    <button class="tbtn"        id="tn-hist"   onclick="showTab('hist')">📜 Historial</button>
-    <button class="tbtn"        id="tn-market" onclick="showTab('market')">🌐 Mercado</button>
-    <button class="tbtn"        id="tn-admin"  onclick="showTab('admin')" style="display:none">👑 Admin</button>
+    <button class="tbtn active" id="tn-dash"   data-tab="dash">📊 Dashboard</button>
+    <button class="tbtn"        id="tn-hist"   data-tab="hist">📜 Historial</button>
+    <button class="tbtn"        id="tn-market" data-tab="market">🌐 Mercado</button>
+    <button class="tbtn"        id="tn-admin"  data-tab="admin" style="display:none">👑 Admin</button>
   </nav>
 
   <div class="cnt">
@@ -261,10 +261,10 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 
       <div class="card">
         <div class="slbl">Registrar operación</div>
-        <div class="oiw"><span class="oipfx">$</span><input type="number" id="pinp" placeholder="Precio de entrada" oninput="onIC()"/></div>
+        <div class="oiw"><span class="oipfx">$</span><input type="number" id="pinp" placeholder="Precio de entrada"/></div>
         <div class="obtns">
-          <button class="obtn obuy"  id="bbuy"  onclick="reg('compra')">▲ COMPRÉ</button>
-          <button class="obtn osell" id="bsell" onclick="reg('venta')">▼ VENDÍ</button>
+          <button class="obtn obuy"  id="bbuy">▲ COMPRÉ</button>
+          <button class="obtn osell" id="bsell">▼ VENDÍ</button>
         </div>
       </div>
 
@@ -274,17 +274,17 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
         <div class="slbl">Análisis IA — Predicción 24h</div>
         <div id="iaout" class="iaph">Registra tu operación y presiona Analizar.</div>
         <div class="iaact">
-          <button class="iabtn" id="iabtn" onclick="doAI()">✦ Analizar con IA</button>
-          <button class="rbtn" onclick="doReset()">↺ Reset historial</button>
+          <button class="iabtn" id="iabtn">✦ Analizar con IA</button>
+          <button class="rbtn" id="rbtn1">↺ Reset historial</button>
         </div>
       </div>
 
       <div class="card">
         <div class="slbl">Gráfico BTC / USDT</div>
         <div class="tfrow">
-          <button class="tfbtn active" onclick="setTF('1m',this)">1m</button>
-          <button class="tfbtn" onclick="setTF('5m',this)">5m</button>
-          <button class="tfbtn" onclick="setTF('15m',this)">15m</button>
+          <button class="tfbtn active" data-tf="1m">1m</button>
+          <button class="tfbtn" data-tf="5m">5m</button>
+          <button class="tfbtn" data-tf="15m">15m</button>
         </div>
         <div id="chcont"><div class="chldr" id="chldr">Cargando gráfico…</div></div>
       </div>
@@ -295,7 +295,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div class="slbl" style="margin-bottom:0">Historial de operaciones</div>
-          <button class="rbtn" onclick="doReset()">↺ Reset</button>
+          <button class="rbtn" id="rbtn2">↺ Reset</button>
         </div>
         <div id="hbody"><div class="empty">Sin operaciones registradas</div></div>
       </div>
@@ -318,7 +318,7 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
           <input id="nuu" type="text" placeholder="Username"/>
           <input id="nup" type="password" placeholder="Contraseña"/>
           <select id="nur"><option value="user">user</option><option value="admin">admin</option></select>
-          <button class="cbtn" onclick="createUser()">+ Crear usuario</button>
+          <button class="cbtn" id="cbtn">+ Crear usuario</button>
         </div>
         <div id="amsg" class="amsg"></div>
       </div>
@@ -329,146 +329,283 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 
 <script>
 'use strict';
+// ─── STATE ────────────────────────────────────────────────
 let TOKEN=localStorage.getItem('bt4')||null,ME=JSON.parse(localStorage.getItem('bt4u')||'null');
 let signal=null,lp=null,pp=null,spk=[],opT=null,opP=null,hist=[],chart=null,cand=null,curTF='1m',ws=null,wst=null;
 
+// ─── API HELPER ───────────────────────────────────────────
+async function api(url,{method='GET',body=null,auth=true}={}){
+  const h={'Content-Type':'application/json'};
+  if(auth&&TOKEN)h['Authorization']='Bearer '+TOKEN;
+  const opts={method,headers:h};if(body)opts.body=JSON.stringify(body);
+  const res=await fetch(url,opts);const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Error '+res.status);
+  return data;
+}
+
+// ─── AUTH ─────────────────────────────────────────────────
 async function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value,e=document.getElementById('le');
   e.textContent='';
   if(!u||!p){e.textContent='Ingresa usuario y contraseña';return;}
-  try{const r=await api('/api/login',{method:'POST',body:{username:u,password:p},auth:false});TOKEN=r.token;ME=r.user;localStorage.setItem('bt4',TOKEN);localStorage.setItem('bt4u',JSON.stringify(ME));startApp();}
-  catch(err){e.textContent=err.message||'Error de conexión';}
+  try{
+    const r=await api('/api/login',{method:'POST',body:{username:u,password:p},auth:false});
+    TOKEN=r.token;ME=r.user;
+    localStorage.setItem('bt4',TOKEN);localStorage.setItem('bt4u',JSON.stringify(ME));
+    startApp();
+  }catch(err){e.textContent=err.message||'Error de conexión';}
 }
-function doLogout(){TOKEN=null;ME=null;localStorage.removeItem('bt4');localStorage.removeItem('bt4u');location.reload();}
-
-async function api(url,{method='GET',body=null,auth=true}={}){
-  const h={'Content-Type':'application/json'};if(auth&&TOKEN)h['Authorization']='Bearer '+TOKEN;
-  const o={method,headers:h};if(body)o.body=JSON.stringify(body);
-  const r=await fetch(url,o),d=await r.json();
-  if(!r.ok)throw new Error(d.error||'Error '+r.status);return d;
+function doLogout(){
+  TOKEN=null;ME=null;localStorage.removeItem('bt4');localStorage.removeItem('bt4u');location.reload();
 }
 
+// ─── START APP ────────────────────────────────────────────
 async function startApp(){
   if(!TOKEN||!ME)return;
-  document.getElementById('ls').style.display='none';document.getElementById('app').style.display='flex';
+  document.getElementById('ls').style.display='none';
+  document.getElementById('app').style.display='flex';
   document.getElementById('nvu').textContent=ME.username;
-  if(ME.role==='admin'){const r=document.getElementById('nvr');r.style.display='inline-block';r.textContent='ADMIN';document.getElementById('tn-admin').style.display='block';}
-  await loadHist();connectWS();fetchSig();setInterval(fetchSig,60000);initChart();loadMkt();setInterval(loadMkt,30000);
+  if(ME.role==='admin'){
+    document.getElementById('nvr').style.display='inline';
+    document.getElementById('nvr').textContent='ADMIN';
+    const adminTab=document.getElementById('tn-admin');
+    if(adminTab)adminTab.style.display='';
+  }
+  await loadHist();
+  connectWS();
+  fetchSig();setInterval(fetchSig,60000);
+  initChart();
+  loadMkt();setInterval(loadMkt,30000);
   if(ME.role==='admin')loadAdmin();
 }
 
+// ─── WEBSOCKET ────────────────────────────────────────────
 function connectWS(){
-  if(ws)try{ws.close();}catch{}
-  ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
-  ws.onopen=()=>{document.getElementById('pmeta').innerHTML='<span class="ldot"></span>LIVE · Binance';if(wst){clearTimeout(wst);wst=null;}};
-  ws.onmessage=e=>{const p=parseFloat(JSON.parse(e.data).p);if(!p||isNaN(p))return;pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();renderP(p);updPnL();updSig();};
-  ws.onerror=()=>ws.close();
-  ws.onclose=()=>{document.getElementById('pmeta').textContent='↻ Reconectando…';wst=setTimeout(connectWS,3000);};
+  try{
+    ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@trade');
+    ws.onopen=()=>{
+      const m=document.getElementById('pmeta');
+      if(m)m.innerHTML='<span class="ldot"></span>LIVE · Binance';
+      if(wst){clearTimeout(wst);wst=null;}
+    };
+    ws.onmessage=e=>{
+      const d=JSON.parse(e.data);const p=parseFloat(d.p);
+      if(!p||isNaN(p))return;
+      pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();
+      renderPrice(p);updatePnL();updateSigUser();
+    };
+    ws.onerror=()=>ws.close();
+    ws.onclose=()=>{wst=setTimeout(connectWS,3000);};
+  }catch(err){
+    console.warn('WS failed, polling fallback');
+    pollPrice();
+  }
 }
 
-function renderP(p){
-  const el=document.getElementById('pv'),cd=document.getElementById('pcrd');
-  const dir=pp===null?'flat':p>pp?'up':p<pp?'down':'flat';
-  el.textContent=fp(p);el.classList.remove('pg','pr');cd.classList.remove('fg','fr');
-  if(dir==='up'){el.classList.add('pg');void cd.offsetWidth;cd.classList.add('fg');}
-  if(dir==='down'){el.classList.add('pr');void cd.offsetWidth;cd.classList.add('fr');}
+// Fallback if WS blocked
+async function pollPrice(){
+  try{
+    const r=await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    const d=await r.json();const p=parseFloat(d.price);
+    if(p&&!isNaN(p)){pp=lp;lp=p;spk.push(p);if(spk.length>80)spk.shift();renderPrice(p);updatePnL();updateSigUser();}
+  }catch{}
+  setTimeout(pollPrice,3000);
+}
+
+// ─── PRICE RENDER ─────────────────────────────────────────
+function renderPrice(p){
+  const el=document.getElementById('pv'),card=document.getElementById('pcrd');
+  if(!el)return;
+  const dir=pp===null?'':p>pp?'up':p<pp?'down':'';
+  el.textContent=fp(p);
+  el.classList.remove('pg','pr');card.classList.remove('fg','fr');
+  if(dir==='up'){el.classList.add('pg');void card.offsetWidth;card.classList.add('fg');}
+  if(dir==='down'){el.classList.add('pr');void card.offsetWidth;card.classList.add('fr');}
   if(signal)drawSpk(spk,sh(signal.action));
 }
 
+// ─── SIGNAL ───────────────────────────────────────────────
 async function fetchSig(){
-  try{signal=await api('/api/signal');if(!lp){lp=signal.current_price;spk.push(lp);}renderSig();updPnL();updSig();}
-  catch(e){document.getElementById('sbadge').textContent='⚠ Sin señal';}
-}
-
-function renderSig(){
-  if(!signal)return;
-  const h=sh(signal.action);
-  const b=document.getElementById('sbadge');
-  b.className='sbadge '+(signal.action==='COMPRAR'?'buy':signal.action==='VENDER'?'sell':'hold');
-  b.textContent=signal.action==='COMPRAR'?'▲ BUY':signal.action==='VENDER'?'▼ SELL':'◆ HOLD';
-  document.getElementById('sconf').textContent=signal.confidence+'% confianza';
-  document.getElementById('cbar').style.cssText='width:'+signal.confidence+'%;background:'+h;
-  document.getElementById('smet').style.display='grid';
-  const rc=signal.rsi<35?'var(--green)':signal.rsi>65?'var(--red)':'var(--text)';
-  sm('mrsi',signal.rsi.toFixed(0),rc);
-  sm('mmacd',signal.macd>0?'▲ +':'▼ −',signal.macd>0?'var(--green)':'var(--red)');
-  sm('mml',(signal.ml_pred>0?'+':'')+(signal.ml_pred*100).toFixed(2)+'%',signal.ml_pred>0.001?'var(--green)':signal.ml_pred<-0.001?'var(--red)':'var(--text)');
-  renderAccum();
-}
-
-function renderAccum(){
-  const a=calcAcum();const row=document.getElementById('totrow'),val=document.getElementById('totval');
-  if(a.trades>0){row.style.display='flex';const n=parseFloat(a.total);val.className='totval '+(n>=0?'pos':'neg');val.textContent=(n>=0?'+':'')+a.total+'% ('+a.trades+' trades)';}
-  else row.style.display='none';
-}
-
-function updSig(){
-  if(!signal||!opT||!opP||!lp){renderSig();return;}
-  const p=lp,raw=((p-opP)/opP)*100,gain=opT==='compra'?raw:-raw;
-  const g=gain.toFixed(2),s=gain>=0?'+':'',mlB=signal.ml_pred>0.002,mlS=signal.ml_pred<-0.002,rsi=signal.rsi;
-  let lbl,h;
-  if(opT==='compra'){
-    if(rsi>75||p>opP*1.05){lbl='▼ VENDER — sobrecompra';h=sh('VENDER');}
-    else if(p<opP*0.94&&!mlB){lbl='⚠ STOP LOSS ('+s+g+'%)';h=sh('VENDER');}
-    else if(p>opP&&(mlB||signal.action==='COMPRAR')){lbl='◆ MANTENER +'+g+'%';h=sh('COMPRAR');}
-    else if(mlS){lbl='⚠ PRECAUCIÓN ('+s+g+'%)';h=sh('MANTENER');}
-    else{lbl='◆ MANTENER ('+s+g+'%)';h=sh('MANTENER');}
-  }else{
-    if(p<opP&&rsi<30){lbl='▲ REENTRADA ÓPTIMA';h=sh('COMPRAR');}
-    else if(p<opP&&mlB){lbl='▲ REENTRADA POSIBLE';h=sh('COMPRAR');}
-    else if(p<opP){lbl='✅ BIEN VENDIDO +'+g+'%';h=sh('COMPRAR');}
-    else if(p>opP*1.03&&mlB){lbl='⚠ REENTRADA URGENTE';h=sh('MANTENER');}
-    else{lbl='⏳ ESPERAR CORRECCIÓN';h=sh('MANTENER');}
+  try{
+    signal=await api('/api/signal');
+    if(!lp){lp=signal.current_price;spk.push(lp);}
+    renderSigBase();updatePnL();updateSigUser();
+  }catch(e){
+    const b=document.getElementById('sbadge');
+    if(b)b.textContent='⚠ Sin señal ('+e.message+')';
   }
-  const b=document.getElementById('sbadge');
-  b.textContent=lbl;b.className='sbadge '+(h==='#00ff9c'?'buy':h==='#ff4d4f'?'sell':'hold');
-  document.getElementById('cbar').style.background=h;
 }
 
+function renderSigBase(){
+  if(!signal)return;
+  const hex=sh(signal.action);
+  const cls=signal.action==='COMPRAR'?'buy':signal.action==='VENDER'?'sell':'hold';
+  const lbl=signal.action==='COMPRAR'?'🟢 BUY':signal.action==='VENDER'?'🔴 SELL':'🟡 HOLD';
+  setSigCard(hex);
+  if(!opT)setSigBadge(lbl,cls);
+  const sc=document.getElementById('sconf');if(sc)sc.textContent=signal.confidence+'% confianza';
+  const cb=document.getElementById('cbar');if(cb)cb.style.cssText='width:'+signal.confidence+'%;background:'+hex;
+  const sm=document.getElementById('smet');if(sm)sm.style.display='grid';
+  const rc=signal.rsi<35?'var(--green)':signal.rsi>65?'var(--red)':'var(--text2)';
+  sm_(document.getElementById('mrsi'),signal.rsi,rc);
+  sm_(document.getElementById('mmacd'),signal.macd>0?'▲ +':'▼ −',signal.macd>0?'var(--green)':'var(--red)');
+  const mlv=(signal.ml_pred>0?'+':'')+(signal.ml_pred*100).toFixed(2)+'%';
+  const mlc=signal.ml_pred>0.002?'var(--green)':signal.ml_pred<-0.002?'var(--red)':'var(--yellow)';
+  sm_(document.getElementById('mml'),mlv,mlc);
+}
+function sm_(el,val,color){if(el){el.textContent=val;el.style.color=color;}}
+
+function setSigCard(hex){
+  const c=document.getElementById('scrd');if(!c)return;
+  c.style.borderColor=hex+'44';c.style.boxShadow='0 0 20px '+hex+'15';
+}
+function setSigBadge(lbl,cls){
+  const b=document.getElementById('sbadge');if(!b)return;
+  b.textContent=lbl;b.className='sbadge '+cls;
+}
+function sh(a){return a==='COMPRAR'?'#00ff9c':a==='VENDER'?'#ff4d4f':'#f0b90b';}
+
+// ─── OPERATIONS ───────────────────────────────────────────
 async function reg(tipo){
   const val=parseFloat(document.getElementById('pinp').value);
-  if(!val||val<=0){document.getElementById('pnlsec').innerHTML='<div class="card" style="color:var(--red);font-size:13px">Ingresa un precio válido</div>';return;}
+  const res=document.getElementById('pnlsec');
+  if(!val||val<=0){if(res)res.innerHTML='<p style="color:var(--red);font-size:13px;padding:4px 0">⚠ Ingresa un precio válido</p>';return;}
   opT=tipo;opP=val;
   document.getElementById('bbuy').classList.toggle('active',tipo==='compra');
   document.getElementById('bsell').classList.toggle('active',tipo==='venta');
-  try{const op=await api('/api/operacion',{method:'POST',body:{tipo,precio:val}});hist.unshift(op);renderHist();}catch{}
-  updPnL();updSig();renderAccum();
+  try{const op=await api('/api/operacion',{method:'POST',body:{tipo,precio:val}});hist.unshift(op);}catch{}
+  updatePnL();updateSigUser();renderAccum();
 }
-function onIC(){if(!opT)return;const v=parseFloat(document.getElementById('pinp').value);if(v>0){opP=v;updPnL();updSig();}}
+
+function onIC(){
+  if(!opT)return;
+  const val=parseFloat(document.getElementById('pinp').value);
+  if(val>0){opP=val;updatePnL();updateSigUser();}
+}
 
 async function loadHist(){
-  try{hist=await api('/api/operaciones');
-    if(hist.length){const l=hist[0];opT=l.tipo;opP=l.precio;document.getElementById('pinp').value=l.precio;document.getElementById('bbuy').classList.toggle('active',l.tipo==='compra');document.getElementById('bsell').classList.toggle('active',l.tipo==='venta');}
-    renderHist();renderAccum();}catch{}
+  try{
+    hist=await api('/api/operaciones');
+    if(hist.length){
+      const last=hist[0];opT=last.tipo;opP=last.precio;
+      document.getElementById('pinp').value=last.precio;
+      document.getElementById('bbuy').classList.toggle('active',last.tipo==='compra');
+      document.getElementById('bsell').classList.toggle('active',last.tipo==='venta');
+    }
+  }catch{}
+  renderHist();renderAccum();
 }
+
 async function doReset(){
   if(!confirm('¿Borrar todo el historial?'))return;
-  try{await api('/api/operaciones',{method:'DELETE'});hist=[];opT=null;opP=null;document.getElementById('pinp').value='';document.getElementById('bbuy').classList.remove('active');document.getElementById('bsell').classList.remove('active');document.getElementById('pnlsec').innerHTML='';document.getElementById('totrow').style.display='none';renderHist();if(signal)renderSig();}
-  catch(e){alert(e.message);}
+  try{await api('/api/operaciones',{method:'DELETE'});}catch{}
+  hist=[];opT=null;opP=null;
+  document.getElementById('pinp').value='';
+  document.getElementById('bbuy').classList.remove('active');
+  document.getElementById('bsell').classList.remove('active');
+  const ps=document.getElementById('pnlsec');if(ps)ps.innerHTML='';
+  const tr=document.getElementById('totrow');if(tr)tr.style.display='none';
+  renderHist();renderSigBase();
 }
 
-function updPnL(){
-  if(!opT||!opP||!lp){document.getElementById('pnlsec').innerHTML='';return;}
-  const p=lp,raw=((p-opP)/opP)*100,gain=opT==='compra'?raw:-raw,pos=gain>=0;
-  const s=pos?'+':'',absD=Math.abs(p-opP),lbl=opT==='compra'?'COMPRÉ':'VENDÍ';
-  let thtml='';
-  if(signal){
-    const rw=opT==='compra'?((signal.sell_target-opP)/opP)*100:((opP-signal.buy_target)/opP)*100;
-    const cl=Math.min(Math.max(rw,1),5),tp=opT==='compra'?opP*(1+cl/100):opP*(1-cl/100);
-    const th=opT==='compra'?'#00ff9c':'#f0b90b',tl=opT==='compra'?'🎯 Vender cuando llegue a':'🎯 Recomprar cuando llegue a';
-    const tip=opT==='compra'?tipC(p,gain):tipV(p,gain);
-    const bb='<div>BB sup: '+fp(signal.bb.upper)+'</div><div>BB med: '+fp(signal.bb.middle)+'</div><div>BB inf: '+fp(signal.bb.lower)+'</div>';
-    thtml='<div class="tbox" style="background:'+th+'0d;border:1px solid '+th+'33"><div class="tboxh" style="color:'+th+'">'+tl+'</div><div class="tbrow"><div><div class="tpbig" style="color:'+th+'">'+fp(tp)+'</div><div class="tpsm">Objetivo: +'+cl.toFixed(1)+'% — rango seguro 1–5%</div></div><div class="tbbcol">'+bb+'</div></div><div class="ttip">'+tip+'</div></div>';
+// ─── PNL ──────────────────────────────────────────────────
+function calcAcum(){
+  const sorted=[...hist].reverse();let total=0,trades=0,pend=null;
+  for(const op of sorted){
+    if(op.tipo==='compra'&&!pend){pend=op.precio;}
+    else if(op.tipo==='venta'&&pend){total+=(op.precio-pend)/pend*100;trades++;pend=null;}
   }
-  document.getElementById('pnlsec').innerHTML='<div class="card"><div class="slbl">Resultado actual</div><div class="pnlc '+(pos?'pos':'neg')+'"><div class="pnlrow"><div><div class="pnll">'+lbl+' a '+fp(opP)+'</div><div class="pnlv '+(pos?'pos':'neg')+'">'+s+gain.toFixed(2)+'%</div><div class="pnla">'+s+fp(absD)+' por BTC</div></div><div class="pnlr"><div>Precio actual</div><div style="color:var(--text);font-weight:700">'+fp(p)+'</div></div></div></div>'+thtml+'</div>';
+  return{total:total.toFixed(2),trades};
 }
-function tipC(p,g){if(!signal)return'';if(signal.rsi>70)return'⚠️ RSI en sobrecompra ('+signal.rsi.toFixed(0)+'). Considera tomar ganancias parciales.';if(p>opP&&signal.action==='COMPRAR')return'✅ ML + técnicos alcistas. Mantén posición. Stop loss: '+fp(opP*.94);if(p<opP&&signal.action==='VENDER')return'⚠️ Precio bajo tu entrada y ML bajista. Evalúa reducir pérdidas.';return'📊 RSI '+signal.rsi.toFixed(0)+'. Señal mixta. Stop loss recomendado: '+fp(opP*.94);}
-function tipV(p,g){if(!signal)return'';if(signal.rsi<30)return'✅ RSI en sobreventa ('+signal.rsi.toFixed(0)+'). Zona de rebote — buena entrada posible.';if(p<opP&&signal.action==='COMPRAR')return'✅ Vendiste bien y ML anticipa rebote. Considera reentrar cerca del objetivo.';if(p>opP)return'⚠️ BTC subió desde tu venta. Evalúa reentrar si ML sigue alcista.';return'📊 RSI '+signal.rsi.toFixed(0)+'. Espera señal clara antes de recomprar.';}
 
-function calcAcum(){const sorted=[...hist].reverse();let tot=0,tr=0,pb=null;for(const op of sorted){if(op.tipo==='compra'&&!pb){pb=op.precio;}else if(op.tipo==='venta'&&pb!==null){tot+=((op.precio-pb)/pb)*100;tr++;pb=null;}}return{total:tot.toFixed(2),trades:tr};}
+function renderAccum(){
+  const a=calcAcum();
+  const tr=document.getElementById('totrow'),tv=document.getElementById('totval');
+  if(!tr||!tv)return;
+  if(a.trades===0){tr.style.display='none';return;}
+  tr.style.display='flex';
+  const v=parseFloat(a.total);
+  tv.textContent=(v>=0?'+':'')+a.total+'%  ('+a.trades+' trades)';
+  tv.className='totval '+(v>0?'pos':v<0?'neg':'');
+}
 
+function updatePnL(){
+  const el=document.getElementById('pnlsec');if(!el)return;
+  if(!opT||!opP||!lp){el.innerHTML='';return;}
+  const rawPct=(lp-opP)/opP*100;
+  const gan=opT==='compra'?rawPct:-rawPct;
+  const pos=gan>=0,lbl=opT==='compra'?'COMPRÉ':'VENDÍ';
+  const sign=gan>=0?'+':'';
+  const tgt=renderTargetHTML(lp,gan);
+  el.innerHTML='<div class="card pnlc '+(pos?'pos':'neg')+'">'
+    +'<div class="pnlrow"><div>'
+    +'<div class="pnll">'+lbl+' a '+fp(opP)+'</div>'
+    +'<div class="pnlv '+(pos?'pos':'neg')+'">'+sign+gan.toFixed(2)+'%</div>'
+    +'<div class="pnla">'+(pos?'Ganancia':'Pérdida')+': '+sign+fp(lp-opP,2)+' por BTC</div>'
+    +'</div>'
+    +'<div class="pnlr"><div>Entrada</div><div style="font-weight:700">'+fp(opP)+'</div><div style="margin-top:6px">Actual</div><div style="font-weight:700;color:#fff">'+fp(lp)+'</div></div>'
+    +'</div>'+tgt+'</div>';
+}
+
+function renderTargetHTML(p,gan){
+  if(!signal||!signal.bb)return'';
+  const isc=opT==='compra';
+  const rawPct=isc?(signal.sell_target-opP)/opP*100:(opP-signal.buy_target)/opP*100;
+  const pctC=Math.min(Math.max(rawPct,1),5);
+  const tPrice=isc?opP*(1+pctC/100):opP*(1-pctC/100);
+  const tHex=isc?'#00ff9c':'#f0b90b';
+  const tLbl=isc?'🎯 VENDER CUANDO LLEGUE A':'🎯 RECOMPRAR CUANDO LLEGUE A';
+  const tPct='Objetivo: '+(isc?'+':'-')+pctC.toFixed(1)+'% (rango 1–5%)';
+  const tip=isc?tipC(p,gan):tipV(p,gan);
+  return'<div class="tbox" style="background:'+tHex+'10;border:1px solid '+tHex+'33;margin-top:10px">'
+    +'<div class="tboxh" style="color:'+tHex+'">'+tLbl+'</div>'
+    +'<div class="tbrow"><div><div class="tpbig" style="color:'+tHex+'">'+fp(tPrice)+'</div><div class="tpsm">'+tPct+'</div></div>'
+    +'<div class="tbbcol"><div>BB sup: '+fp(signal.bb.upper)+'</div><div>BB med: '+fp(signal.bb.middle)+'</div><div>BB inf: '+fp(signal.bb.lower)+'</div></div></div>'
+    +'<div class="ttip">'+tip+'</div></div>';
+}
+
+function tipC(p,g){
+  if(!signal)return'';
+  if(signal.rsi>70)return'⚠️ RSI en sobrecompra ('+signal.rsi.toFixed(0)+'). Considera venta parcial.';
+  if(p>opP&&signal.action==='COMPRAR')return'✅ ML alcista. Mantén. Stop loss sugerido: '+fp(opP*.94)+'.';
+  if(p<opP&&signal.action==='VENDER')return'⚠️ Precio bajo entrada y ML bajista. Evalúa salida.';
+  return'📊 Señales mixtas. RSI '+signal.rsi.toFixed(0)+'. Stop loss: '+fp(opP*.94)+'.';
+}
+function tipV(p,g){
+  if(!signal)return'';
+  if(signal.rsi<30)return'✅ RSI en sobreventa ('+signal.rsi.toFixed(0)+'). Posible rebote. Zona de recompra.';
+  if(p<opP&&signal.action==='COMPRAR')return'✅ Vendiste bien y ML señala rebote. Considera reentrar.';
+  if(p>opP)return'⚠️ BTC subió desde tu venta. Evalúa reentrada si ML sigue alcista.';
+  return'📊 RSI '+signal.rsi.toFixed(0)+'. Sin señal clara. Espera al target antes de recomprar.';
+}
+
+function updateSigUser(){
+  if(!signal||!opT||!opP||!lp){renderSigBase();return;}
+  const p=lp,rawPct=(p-opP)/opP*100,gan=opT==='compra'?rawPct:-rawPct;
+  const g=gan.toFixed(2),s=gan>=0?'+':'';
+  const mlBull=signal.ml_pred>.002,mlBear=signal.ml_pred<-.002;
+  let lbl,cls,hex;
+  if(opT==='compra'){
+    if(signal.rsi>75||p>opP*1.05)              {lbl='🔴 VENDER (SOBRECOMPRA)'; cls='sell';hex='#ff4d4f';}
+    else if(p<opP*.94&&!mlBull)                {lbl='⚠️ STOP LOSS ('+s+g+'%)'; cls='sell';hex='#ff4d4f';}
+    else if(p>opP&&(mlBull||signal.action==='COMPRAR')){lbl='🟢 HOLD (GANANCIA '+s+g+'%)';cls='buy'; hex='#00ff9c';}
+    else if(p<opP&&mlBear)                     {lbl='🟡 PRECAUCIÓN ('+s+g+'%)'; cls='hold';hex='#f0b90b';}
+    else                                       {lbl='🟡 HOLD ('+s+g+'%)';       cls='hold';hex='#f0b90b';}
+  }else{
+    if(p<opP&&signal.rsi<30)                   {lbl='🟢 REENTRADA ÓPTIMA';      cls='buy'; hex='#00ff9c';}
+    else if(p<opP&&mlBull)                     {lbl='🟢 REENTRADA POSIBLE';     cls='buy'; hex='#00ff9c';}
+    else if(p<opP)                             {lbl='✅ BIEN VENDIDO ('+s+g+'%)';cls='buy'; hex='#00ff9c';}
+    else if(p>opP*1.03&&mlBull)                {lbl='⚠️ REENTRADA URGENTE';     cls='hold';hex='#f0b90b';}
+    else                                       {lbl='⏳ ESPERAR';               cls='hold';hex='#f0b90b';}
+  }
+  setSigCard(hex);setSigBadge(lbl,cls);
+  const cb=document.getElementById('cbar');if(cb)cb.style.background=hex;
+  renderAccum();
+}
+
+// ─── HISTORIAL ────────────────────────────────────────────
 function renderHist(){
-  const el=document.getElementById('hbody');
+  const el=document.getElementById('hbody');if(!el)return;
   if(!hist.length){el.innerHTML='<div class="empty">Sin operaciones registradas</div>';return;}
   const rows=hist.map((op,i)=>{
     let res='—';if(op.tipo==='venta'){const b=hist.slice(i+1).find(o=>o.tipo==='compra');if(b){const p=((op.precio-b.precio)/b.precio*100).toFixed(2);res='<span class="'+(parseFloat(p)>=0?'tb':'ts')+'">'+(parseFloat(p)>=0?'+':'')+p+'%</span>';}}
@@ -479,6 +616,7 @@ function renderHist(){
   renderAccum();
 }
 
+// ─── IA ───────────────────────────────────────────────────
 async function doAI(){
   if(!signal)return;
   const btn=document.getElementById('iabtn'),out=document.getElementById('iaout');
@@ -491,25 +629,42 @@ async function doAI(){
   btn.disabled=false;btn.textContent='✦ Analizar con IA';
 }
 
+// ─── CHART ────────────────────────────────────────────────
 function initChart(){
-  const el=document.getElementById('chcont');
-  chart=LightweightCharts.createChart(el,{width:el.clientWidth,height:260,layout:{background:{type:'solid',color:'#070e1c'},textColor:'#718096'},grid:{vertLines:{color:'#1a2235'},horzLines:{color:'#1a2235'}},crosshair:{mode:LightweightCharts.CrosshairMode.Normal},rightPriceScale:{borderColor:'#1e2d45'},timeScale:{borderColor:'#1e2d45',timeVisible:true,secondsVisible:false}});
+  const el=document.getElementById('chcont');if(!el)return;
+  // LightweightCharts v3 API
+  chart=LightweightCharts.createChart(el,{
+    width:el.clientWidth,height:260,
+    layout:{backgroundColor:'#070e1c',textColor:'#718096'},
+    grid:{vertLines:{color:'#1a2235'},horzLines:{color:'#1a2235'}},
+    crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+    rightPriceScale:{borderColor:'#1e2d45'},
+    timeScale:{borderColor:'#1e2d45',timeVisible:true,secondsVisible:false}
+  });
   cand=chart.addCandlestickSeries({upColor:'#00ff9c',downColor:'#ff4d4f',borderUpColor:'#00ff9c',borderDownColor:'#ff4d4f',wickUpColor:'#00ff9c',wickDownColor:'#ff4d4f'});
   loadK('1m');
   const ro=new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth}));ro.observe(el);
 }
+
 async function loadK(tf){
-  document.getElementById('chldr').style.display='flex';
+  const ldr=document.getElementById('chldr');if(ldr)ldr.style.display='flex';
   try{
     const r=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval='+tf+'&limit=150');
     const data=await r.json();
     cand.setData(data.map(k=>({time:Math.floor(k[0]/1000),open:parseFloat(k[1]),high:parseFloat(k[2]),low:parseFloat(k[3]),close:parseFloat(k[4])})));
     chart.timeScale().fitContent();
-  }catch{document.getElementById('chldr').textContent='No se pudo cargar el gráfico.';return;}
-  document.getElementById('chldr').style.display='none';
+  }catch{if(ldr)ldr.textContent='No se pudo cargar el gráfico.';return;}
+  if(ldr)ldr.style.display='none';
 }
-function setTF(tf,btn){curTF=tf;document.querySelectorAll('.tfbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadK(tf);}
 
+function setTF(tf,btn){
+  curTF=tf;
+  document.querySelectorAll('.tfbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  loadK(tf);
+}
+
+// ─── MARKET ───────────────────────────────────────────────
 async function loadMkt(){
   const el=document.getElementById('mbody');
   try{
@@ -530,11 +685,31 @@ async function loadMkt(){
   }catch{el.innerHTML='<div class="empty">Error cargando datos del mercado. Intenta de nuevo.</div>';}
 }
 
+// ─── ADMIN ────────────────────────────────────────────────
 async function loadAdmin(){try{const u=await api('/api/admin/users');renderAdmin(u);}catch{}}
 function renderAdmin(users){
   if(!users.length){document.getElementById('abody').innerHTML='<div class="empty">Sin usuarios</div>';return;}
-  const rows=users.map(u=>'<tr><td>'+u.id+'</td><td style="font-weight:600">'+u.username+'</td><td class="'+(u.role==='admin'?'ra':'ru')+'">'+u.role+'</td><td><div class="brow">'+(u.id!==ME.id?'<button class="bsm bd" onclick="aDel('+u.id+',\''+u.username+'\')">Eliminar</button>':'')+'<button class="bsm bw" onclick="aRH('+u.id+',\''+u.username+'\')">Reset hist.</button><button class="bsm bi" onclick="aPwd('+u.id+',\''+u.username+'\')">Contraseña</button></div></td></tr>').join('');
+  // Build rows with data attributes instead of inline handlers
+  const rows=users.map(u=>'<tr>'
+    +'<td>'+u.id+'</td>'
+    +'<td style="font-weight:600">'+u.username+'</td>'
+    +'<td class="'+(u.role==='admin'?'ra':'ru')+'">'+u.role+'</td>'
+    +'<td><div class="brow">'
+    +(u.id!==ME.id?'<button class="bsm bd" data-action="del" data-id="'+u.id+'" data-name="'+u.username+'">Eliminar</button>':'')
+    +'<button class="bsm bw" data-action="rst" data-id="'+u.id+'" data-name="'+u.username+'">Reset hist.</button>'
+    +'<button class="bsm bi" data-action="pwd" data-id="'+u.id+'" data-name="'+u.username+'">Contraseña</button>'
+    +'</div></td></tr>'
+  ).join('');
   document.getElementById('abody').innerHTML='<table class="atbl"><thead><tr><th>ID</th><th>Usuario</th><th>Rol</th><th>Acciones</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  // Attach listeners via delegation
+  document.getElementById('abody').addEventListener('click',adminDelegate);
+}
+function adminDelegate(e){
+  const btn=e.target.closest('[data-action]');if(!btn)return;
+  const {action,id,name}=btn.dataset;
+  if(action==='del')aDel(parseInt(id),name);
+  if(action==='rst')aRH(parseInt(id),name);
+  if(action==='pwd')aPwd(parseInt(id),name);
 }
 async function aDel(id,name){if(!confirm('¿Eliminar "'+name+'"?'))return;try{await api('/api/admin/users/'+id,{method:'DELETE'});loadAdmin();}catch(e){alert(e.message);}}
 async function aRH(id,name){if(!confirm('¿Resetear historial de "'+name+'"?'))return;try{await api('/api/admin/users/'+id+'/operaciones',{method:'DELETE'});alert('Historial reseteado');}catch{}}
@@ -542,31 +717,89 @@ async function aPwd(id,name){const p=prompt('Nueva contraseña para "'+name+'":'
 async function createUser(){
   const u=document.getElementById('nuu').value.trim(),p=document.getElementById('nup').value,r=document.getElementById('nur').value,msg=document.getElementById('amsg');
   if(!u||!p){msg.style.color='var(--red)';msg.textContent='Completa todos los campos';return;}
-  try{await api('/api/admin/users',{method:'POST',body:{username:u,password:p,role:r}});msg.style.color='var(--green)';msg.textContent='✅ Usuario "'+u+'" creado';document.getElementById('nuu').value='';document.getElementById('nup').value='';loadAdmin();setTimeout(()=>msg.textContent='',3000);}
-  catch(e){msg.style.color='var(--red)';msg.textContent=e.message;}
+  try{
+    await api('/api/admin/users',{method:'POST',body:{username:u,password:p,role:r}});
+    msg.style.color='var(--green)';msg.textContent='✅ Usuario "'+u+'" creado';
+    document.getElementById('nuu').value='';document.getElementById('nup').value='';
+    loadAdmin();setTimeout(()=>msg.textContent='',3000);
+  }catch(e){msg.style.color='var(--red)';msg.textContent=e.message;}
 }
 
+// ─── TABS ─────────────────────────────────────────────────
 function showTab(t){
   document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('p-'+t).classList.add('active');document.getElementById('tn-'+t).classList.add('active');
-  if(t==='hist')renderHist();if(t==='market')loadMkt();if(t==='admin')loadAdmin();
-  if(t==='dash'&&chart)chart.applyOptions({width:document.getElementById('chcont').clientWidth});
+  const pane=document.getElementById('p-'+t),btn=document.getElementById('tn-'+t);
+  if(pane)pane.classList.add('active');if(btn)btn.classList.add('active');
+  if(t==='hist')renderHist();
+  if(t==='market')loadMkt();
+  if(t==='admin')loadAdmin();
+  if(t==='dash'&&chart){const c=document.getElementById('chcont');if(c)chart.applyOptions({width:c.clientWidth});}
 }
 
+// ─── SPARKLINE ────────────────────────────────────────────
 function drawSpk(prices,hex){
   if(prices.length<2)return;const W=100,H=32,step=Math.max(1,Math.floor(prices.length/40));
   const s=prices.filter((_,i)=>i%step===0);const mn=Math.min(...s),mx=Math.max(...s),r=mx-mn||1;
   const pts=s.map((p,i)=>`${(i/(s.length-1))*W},${H-((p-mn)/r)*(H-2)+1}`).join(' ');
-  document.getElementById('sparkline').innerHTML='<defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="'+hex+'" stop-opacity=".2"/><stop offset="100%" stop-color="'+hex+'" stop-opacity="1"/></linearGradient></defs><polyline points="'+pts+'" fill="none" stroke="url(#sg)" stroke-width="1.8" stroke-linejoin="round"/>';
+  const el=document.getElementById('sparkline');if(!el)return;
+  el.innerHTML='<defs><linearGradient id="sg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="'+hex+'" stop-opacity=".2"/><stop offset="100%" stop-color="'+hex+'" stop-opacity="1"/></linearGradient></defs><polyline points="'+pts+'" fill="none" stroke="url(#sg)" stroke-width="1.8" stroke-linejoin="round"/>';
 }
-function fp(n,d=0){if(n==null||isNaN(n))return'—';return'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});}
-function sh(a){return a==='COMPRAR'?'#00ff9c':a==='VENDER'?'#ff4d4f':'#f0b90b';}
-function sm(id,val,color){const el=document.getElementById(id);el.textContent=val;el.style.color=color;}
 
-if(TOKEN&&ME)startApp();
-document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-document.getElementById('lu').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lp').focus();});
+function fp(n,d=0){if(n==null||isNaN(n))return'—';return'$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+// ─── EVENT LISTENERS (replaces all inline onclick) ────────
+document.addEventListener('DOMContentLoaded',()=>{
+  // Login
+  const lbtn=document.getElementById('lbtn');
+  if(lbtn)lbtn.addEventListener('click',doLogin);
+
+  // Logout
+  const lout=document.getElementById('lout');
+  if(lout)lout.addEventListener('click',doLogout);
+
+  // Tab nav — use data-tab attribute
+  document.querySelectorAll('.tbtn[data-tab]').forEach(btn=>{
+    btn.addEventListener('click',()=>showTab(btn.dataset.tab));
+  });
+
+  // Price input
+  const pinp=document.getElementById('pinp');
+  if(pinp)pinp.addEventListener('input',onIC);
+
+  // Buy / Sell
+  const bbuy=document.getElementById('bbuy');
+  if(bbuy)bbuy.addEventListener('click',()=>reg('compra'));
+  const bsell=document.getElementById('bsell');
+  if(bsell)bsell.addEventListener('click',()=>reg('venta'));
+
+  // IA
+  const iabtn=document.getElementById('iabtn');
+  if(iabtn)iabtn.addEventListener('click',doAI);
+
+  // Reset buttons (dashboard + historial tab)
+  document.querySelectorAll('#rbtn1,#rbtn2').forEach(b=>{
+    if(b)b.addEventListener('click',doReset);
+  });
+
+  // TF buttons
+  document.querySelectorAll('.tfbtn[data-tf]').forEach(btn=>{
+    btn.addEventListener('click',()=>setTF(btn.dataset.tf,btn));
+  });
+
+  // Admin create user
+  const cbtn=document.getElementById('cbtn');
+  if(cbtn)cbtn.addEventListener('click',createUser);
+
+  // Enter on login
+  const lp_el=document.getElementById('lp');
+  if(lp_el)lp_el.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+  const lu_el=document.getElementById('lu');
+  if(lu_el)lu_el.addEventListener('keydown',e=>{if(e.key==='Enter'){ const lp2=document.getElementById('lp');if(lp2)lp2.focus();}});
+
+  // Auto-start if token present
+  if(TOKEN&&ME)startApp();
+});
 </script>
 </body>
 </html>

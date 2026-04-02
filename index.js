@@ -17,15 +17,21 @@ const PROD_ORIGIN = process.env.FRONTEND_ORIGIN || "*";
 //  SEGURIDAD GLOBAL
 // ═══════════════════════════════════════════════════════════════════
 
-// Helmet — headers de seguridad (CSP, HSTS, etc.)
+// Helmet — CSP configurado para permitir Binance WS, unpkg y event handlers inline
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "unpkg.com", "cdnjs.cloudflare.com", "'unsafe-inline'"],
-      connectSrc: ["'self'", "api.binance.com", "stream.binance.com", "api.anthropic.com"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      imgSrc:     ["'self'", "data:"],
+      defaultSrc:    ["'self'"],
+      scriptSrc:     ["'self'", "https://unpkg.com", "https://cdnjs.cloudflare.com", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      connectSrc:    ["'self'",
+                      "https://api.binance.com",
+                      "wss://stream.binance.com",
+                      "https://stream.binance.com",
+                      "https://api.anthropic.com"],
+      styleSrc:      ["'self'", "'unsafe-inline'"],
+      imgSrc:        ["'self'", "data:", "blob:"],
+      workerSrc:     ["'self'", "blob:"],
     },
   },
 }));
