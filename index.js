@@ -26,10 +26,10 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         "https://api.binance.com",
-        "wss://stream.binance.com",
+        "https://*.binance.com",
+        "wss://*.binance.com",
         "wss://stream.binance.com:9443",
         "wss://stream.binance.com:443",
-        "https://stream.binance.com",
         "https://api.anthropic.com",
         "https://api.coingecko.com"
       ],
@@ -253,7 +253,7 @@ app.get("/api/market", requireAuth, async (req, res) => {
   try {
     const results = await Promise.allSettled(
       COIN_SYMBOLS.map(s =>
-        fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${s}`, { signal: AbortSignal.timeout(8000) })
+        fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${s}`, { signal: AbortSignal.timeout(15000) }) // Aumentado a 15s
           .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       )
     );
